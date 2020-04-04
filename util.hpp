@@ -1,6 +1,7 @@
 #ifndef LIPH_UTIL_HPP
 #define LIPH_UTIL_HPP
 
+#include <stack>
 #include <string>
 #include <string_view>
 
@@ -16,6 +17,14 @@ template<typename Char, typename Traits, typename Alloc>
 std::basic_string<Char, Traits, Alloc> operator+(std::basic_string_view<Char, Traits> left, std::basic_string<Char, Traits, Alloc> right) {
     right.insert(0, left);
     return right;
+}
+
+
+template<typename T>
+T pop(std::stack<T> &s) {
+    T value = s.top();
+    s.pop();
+    return value;
 }
 
 

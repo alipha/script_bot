@@ -94,7 +94,7 @@ operation_type lookup_operation(std::string_view symbol, bool in_binary_context)
 
 operation_type lookup_operation(op_code code) {
     int code_index = static_cast<int>(code);
-    if(code_index >= static_cast<int>(op_code::count))
+    if(code >= op_code::count)
         throw std::out_of_range("op_code >= op_code::count. Value: " + std::to_string(code_index));
     return operation_types[code_index];
 }

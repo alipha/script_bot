@@ -18,14 +18,6 @@ using token = std::variant<std::string, op_code>;
 std::string parse_str_literal(std::string_view str);
 
 
-template<typename T>
-T pop(std::stack<T> &s) {
-    T value = s.top();
-    s.pop();
-    return value;
-}
-
-
 bool has_lower_precedence(op_code current_code, op_code top_code) {
     operation_type current = lookup_operation(current_code);
     operation_type top = lookup_operation(top_code);

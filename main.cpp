@@ -1,5 +1,6 @@
 #include "tokenizer.hpp"
 #include "compiler.hpp"
+#include "interpreter.hpp"
 #include <iostream>
 
 
@@ -30,6 +31,7 @@ int main() {
         std::cout << std::endl;
         std::cout << to_postfix(t.tokens()) << std::endl;
         std::cout << to_hex(compile(t.tokens())) << std::endl;
+        std::cout << "Result: " << execute(compile(t.tokens())) << std::endl;
     }
 
     return 0;

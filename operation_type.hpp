@@ -62,6 +62,14 @@ enum class op_code : std::uint8_t {
 };
 
 
+inline bool operator<(op_code a, op_code b)  { return static_cast<int>(a) < static_cast<int>(b); }
+inline bool operator<=(op_code a, op_code b) { return static_cast<int>(a) <= static_cast<int>(b); }
+inline bool operator>(op_code a, op_code b)  { return static_cast<int>(a) > static_cast<int>(b); }
+inline bool operator>=(op_code a, op_code b) { return static_cast<int>(a) >= static_cast<int>(b); }
+inline bool operator!=(op_code a, op_code b) { return static_cast<int>(a) != static_cast<int>(b); }
+inline bool operator==(op_code a, op_code b) { return static_cast<int>(a) == static_cast<int>(b); }
+
+
 enum associative : std::uint8_t {
     left,
     right
@@ -82,6 +90,17 @@ struct operation_type {
 operation_type lookup_operation(std::string_view symbol, bool in_binary_context);
 operation_type lookup_operation(op_code code);
 
+
+// TODO: add check in loading operation_type table
+inline bool is_binary_op(op_code code) {
+    return (code >= op_code::pow && code <= op_code::logic_or)
+        || (code >= op_code::assign && code <= op_code::shr_assign)
+        || (code == op_code::array_index);
+}
+
+inline bool is_unary_op(op_code code) {
+    return code >= op_code::negate && code <= op_code::post_dec;
+}
 
 #endif
 

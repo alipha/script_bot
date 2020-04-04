@@ -35,7 +35,9 @@ public:
             pos += alignof(T) - misalignment;
         
         bounds_check(sizeof(T));
-        return std::launder(reinterpret_cast<T*>(&buf[pos]));
+        T *result = std::launder(reinterpret_cast<T*>(&buf[pos]));
+        pos += sizeof(T);
+        return result;
     }
 
     std::string_view read_str() {
@@ -85,6 +87,8 @@ public:
     }
 
     const std::vector<char> &buffer() const { return buf; }
+    std::size_t position() const { return pos; }
+    std::size_t size() const { return buf.size(); }
 
 private:
     std::vector<char> buf;
