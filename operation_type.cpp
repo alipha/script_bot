@@ -48,10 +48,15 @@ operation_type operation_types[] = {
     {"^=",  true,  2, associative::right, 200, op_code::xor_assign},
     {"|=",  true,  2, associative::right, 200, op_code::or_assign},
     {"<<=", true,  2, associative::right, 200, op_code::shl_assign},
-    {">>=", true,  2, associative::right, 200, op_code::shr_assign}
-//        {"(",   true,  0, associative::left,  100, op_code::none},    // ??
-//        {"(",   false, 0, associative::left,  100, op_code::none},    // ??
-//        {")",   false, 0, associative::left,  101, op_code::none},    // ??
+    {">>=", true,  2, associative::right, 200, op_code::shr_assign},
+    {"(",   true,  2, associative::left,  100, op_code::func_call},
+    {"(",   false, 1, associative::left,  100, op_code::left_paren},
+    {")",   true,  1, associative::left,  101, op_code::right_paren},
+    {"[",   true,  2, associative::left,  100, op_code::array_index},
+    {"[",   false, 1, associative::left,  100, op_code::array_start},
+    {"]",   true,  1, associative::left,  101, op_code::array_end},
+    {"{",   false, 1, associative::left,  100, op_code::map_start},
+    {"}",   true,  1, associative::left,  101, op_code::map_end}
 };
 
 

@@ -19,6 +19,8 @@ public:
     const std::string &source() const { return src; }
     const std::vector<std::string_view> &tokens() const { return toks; }
 
+    static bool is_identifier(char ch) { return std::isalpha(ch) || ch == '_' || ch == '$'; }
+
 private:
     enum class stage {
         whitespace,

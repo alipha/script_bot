@@ -47,7 +47,7 @@ void tokenizer::tokenize() {
                 token_stage = stage::number;
                 finish_token = true;
             }
-        } else if(std::isalpha(ch) || ch == '_') {
+        } else if(is_identifier(ch)) {
             if(token_stage != stage::identifier) {
                 token_stage = stage::identifier;
                 finish_token = true;

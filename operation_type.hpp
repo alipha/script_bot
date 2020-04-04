@@ -45,7 +45,20 @@ enum class op_code : std::uint8_t {
     or_assign,
     shl_assign,
     shr_assign,
-    count
+    func_call,
+    left_paren,
+    right_paren,
+    array_index,
+    array_start,
+    array_end,
+    map_start,
+    map_end,
+    count,
+
+    var,
+    int_lit,
+    float_lit,
+    str_lit
 };
 
 
