@@ -1,6 +1,8 @@
 #include "tokenizer.hpp"
 #include "compiler.hpp"
 #include "interpreter.hpp"
+
+#include <boost/asio.hpp>
 #include <iostream>
 
 
