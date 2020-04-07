@@ -1,9 +1,16 @@
 #include "tokenizer.hpp"
 #include "compiler.hpp"
 #include "interpreter.hpp"
+#include "irc.hpp"
+#include "util.hpp"
 
-#include <boost/asio.hpp>
 #include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+
+using namespace std::string_literals;
 
 
 std::string to_hex(const std::vector<char> &bytes) {
@@ -20,7 +27,35 @@ std::string to_hex(const std::vector<char> &bytes) {
 }
 
 
-int main() {
+std::string run(std::string_view code) {
+    try {
+        tokenizer t(std::string(code.data(), code.size()));
+        return std::to_string(execute(compile(t.tokens())));
+    } catch(std::exception &e) {
+        return "Error: "s + e.what();
+    }
+}
+
+
+int main(int argc, char* argv[]) {
+    if(argc > 1 && argv[1] == std::string_view("irc")) {
+        irc_client irc;
+        irc.login();
+
+        while(true) {
+            irc_message msg = irc.read();
+
+            if(msg.action() != "PRIVMSG")
+                continue;
+
+            if(msg.sender_nick() == "Alipha" && msg.target() == "LiphBot") {
+                irc.write(msg.message());
+            } else if(starts_with(msg.message(), "!calc ")) {
+                irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": " + run(msg.message().substr(6)));
+            }
+        }
+    }
+
     while(true) {
         std::string line;
         std::cout << "Input: ";

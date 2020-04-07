@@ -28,4 +28,8 @@ T pop(std::stack<T> &s) {
 }
 
 
+inline bool starts_with(std::string_view str, std::string_view prefix) {
+    return str.size() >= prefix.size() && str.substr(0, prefix.size()) == prefix;       
+}
+
 #endif

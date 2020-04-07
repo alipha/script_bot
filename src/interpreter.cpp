@@ -8,10 +8,6 @@
 #include <vector>
 
 
-
-#include <iostream>
-
-
 void execute_binary_op(std::stack<int> &operands, op_code code);
 void execute_unary_op(std::stack<int> &operands, op_code code);
 
@@ -41,7 +37,6 @@ int execute(const std::vector<char> &program) {
     std::stack<int> operands;
 
     while(buffer.position() < buffer.size()) {
-        std::cout << "buf pos=" << buffer.position() << ", size=" << buffer.size() << std::endl;
         op_code code = *buffer.read<op_code>();
        
         if(code == op_code::left_paren || code == op_code::right_paren) { 
