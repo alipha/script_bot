@@ -13,10 +13,10 @@ using namespace std::string_literals;
 
 operation_type operation_types[] = {
     {"",    true,  0, associative::left,    0, op_category::other,      op_code::none},
+    {";",   true,  2, associative::left,   10, op_category::other,      op_code::semicolon},
     {".",   true,  2, associative::left,  900, op_category::other,      op_code::dot},
     {"(",   true,  2, associative::left,  100, op_category::other,      op_code::func_call},
     {"[",   true,  2, associative::left,  100, op_category::other,      op_code::array_index},
-    {"**",  true,  2, associative::left,  575, op_category::other,      op_code::pow},
     {"<",   true,  2, associative::left,  450, op_category::comparison, op_code::lt},
     {"<=",  true,  2, associative::left,  450, op_category::comparison, op_code::lte},
     {">",   true,  2, associative::left,  450, op_category::comparison, op_code::gt},
@@ -31,6 +31,7 @@ operation_type operation_types[] = {
     {"|",   true,  2, associative::left,  325, op_category::integer,    op_code::bit_or},
     {"<<",  true,  2, associative::left,  475, op_category::integer,    op_code::shl},
     {">>",  true,  2, associative::left,  475, op_category::integer,    op_code::shr},
+    {"**",  true,  2, associative::left,  575, op_category::arithmetic, op_code::pow},
     {"+",   true,  2, associative::left,  500, op_category::arithmetic, op_code::add},
     {"-",   true,  2, associative::left,  500, op_category::arithmetic, op_code::sub},
     {"*",   true,  2, associative::left,  550, op_category::arithmetic, op_code::mul},
@@ -42,6 +43,7 @@ operation_type operation_types[] = {
     {"|=",  true,  2, associative::right, 200, op_category::assignment, op_code::or_assign},
     {"<<=", true,  2, associative::right, 200, op_category::assignment, op_code::shl_assign},
     {">>=", true,  2, associative::right, 200, op_category::assignment, op_code::shr_assign},
+    {"**=", true,  2, associative::right, 200, op_category::assignment, op_code::pow_assign},
     {"+=",  true,  2, associative::right, 200, op_category::assignment, op_code::add_assign},
     {"-=",  true,  2, associative::right, 200, op_category::assignment, op_code::sub_assign},
     {"*=",  true,  2, associative::right, 200, op_category::assignment, op_code::mul_assign},
@@ -112,8 +114,8 @@ std::map<std::pair<std::string_view, bool>, operation_type> load_operation_types
         if(t.category == op_category::assignment && t.operand_count == 2 && t.code != op_code::assign) {
             std::string_view symbol = t.symbol;
             symbol.remove_suffix(1);
-            if(types[code_index - 11].symbol != symbol)
-                throw std::logic_error(t.symbol + " is not 11 op_codes after "s + symbol);
+            if(types[code_index - 12].symbol != symbol)
+                throw std::logic_error(t.symbol + " is not 12 op_codes after "s + symbol);
         }
 
         type_map[std::pair(t.symbol, t.in_binary_context)] = t;

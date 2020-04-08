@@ -69,7 +69,7 @@ void tokenizer::tokenize() {
                     /* do nothing */
                 } else if(token_end - token_begin == 2) {
                     std::string_view token(token_begin, token_end - token_begin);
-                    if(token != "<<" && token != ">>") {
+                    if(token != "<<" && token != ">>" && token != "**") {
                         finish_token = true;
                     }
                 } else {

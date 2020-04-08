@@ -3,7 +3,9 @@
 #include "operation_type.hpp"
 #include "util.hpp"
 
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <sstream>
@@ -34,27 +36,6 @@ value_type do_with_doubles(const value_type &left, const value_type &right, Func
 void execute_binary_op(std::stack<value_type> &operands, op_code code);
 void execute_unary_op(std::stack<value_type> &operands, op_code code);
 
-/*
-// pow
-// mod
-// shl
-// shr
-//
-template<typename T>
-struct arithmetic_ops {
-    static T mul(T a, T b) { return a * b; }
-    static T div(T a, T b) { return a / b; }
-    static T add(T a, T b) { return a + b; }
-    static T sub(T a, T b) { return a - b; }
-    static std::int32_t  lt(T a, T b) { return a < b; }
-    static std::int32_t lte(T a, T b) { return a <= b; }
-    static std::int32_t  gt(T a, T b) { return a > b; }
-    static std::int32_t gte(T a, T b) { return a >= b; }
-    static std::int32_t  eq(T a, T b) { return a == b; }
-    static std::int32_t neq(T a, T b) { return a != b; }
-    static T negate(T a) { return -a; }
-};
-*/
 
 std::string execute(const std::vector<char> &program) {
     memory_buffer<true> buffer(program);    // TODO: false?
@@ -63,25 +44,31 @@ std::string execute(const std::vector<char> &program) {
     while(buffer.position() < buffer.size()) {
         op_code code = *buffer.read<op_code>();
        
-        if(code == op_code::left_paren || code == op_code::right_paren) { 
-            /* do nothing */
-        } else if(code == op_code::var) {
+        switch(code) {
+        case op_code::left_paren:
+        case op_code::right_paren:
+            break;
+        case op_code::var:
             throw std::logic_error("var is currently unsupported");
-        } else if(code == op_code::int_lit) {
+        case op_code::int_lit:
             operands.push(*buffer.read<std::int32_t>());
-        } else if(code == op_code::float_lit) {
+            break;
+        case op_code::float_lit:
             operands.push(*buffer.read<double>());
-        } else if(code == op_code::str_lit) {
+            break;
+        case op_code::str_lit:
             throw std::logic_error("str_lit is currently unsupported");
-        } else if(is_binary_op(code)) {
-            execute_binary_op(operands, code);
-        } else {
-            execute_unary_op(operands, code);
+        default:
+            if(is_binary_op(code)) {
+                execute_binary_op(operands, code);
+            } else {
+                execute_unary_op(operands, code);
+            }
         }
     }
 
-    if(operands.size() != 1) {
-        throw std::logic_error("Expected only 1 ooperand in stack. size: " + std::to_string(operands.size()));
+    if(operands.size() != 1) {  // TODO: remove?
+        throw std::logic_error("Expected one operand in stack. size: " + std::to_string(operands.size()));
     }
 
     return std::visit([](auto &&value) {
@@ -128,11 +115,12 @@ std::int32_t binary_int_op(op_code code, Left &&left, Right &&right) {
 
 
 template<typename Left, typename Right>
-auto binary_arithmetic(op_code code, Left &&l, Right &&r) {
+value_type binary_arithmetic(op_code code, Left &&l, Right &&r) {
     using LeftT = std::decay_t<Left>;
     using RightT = std::decay_t<Right>;
 
     switch(code) {
+    case op_code::pow: return std::pow(l, r);
     case op_code::add: return l + r;
     case op_code::sub: return l - r;
     case op_code::mul: return l * r;
@@ -140,6 +128,9 @@ auto binary_arithmetic(op_code code, Left &&l, Right &&r) {
         if constexpr(std::is_same_v<LeftT, std::int32_t> && std::is_same_v<RightT, std::int32_t>) {
             if(r == 0)
                 throw std::runtime_error("Division by zero");
+            if(l == std::numeric_limits<std::int32_t>::min() && r == -1)
+                throw std::runtime_error("Overflow computing: " 
+                        + std::to_string(std::numeric_limits<std::int32_t>::min()) + " / -1");
         }
         return l / r;
     default:
@@ -158,6 +149,8 @@ void execute_binary_op(std::stack<value_type> &operands, op_code code) {
     value_type left = pop(operands);
 
     value_type result = std::visit([code](auto &&l, auto &&r) -> value_type {
+        if(code == op_code::semicolon)
+            return r;
         if(is_binary_comp(code))
             return static_cast<std::int32_t>(binary_comp(code, l, r));
         if(is_binary_int_op(code))
@@ -168,38 +161,6 @@ void execute_binary_op(std::stack<value_type> &operands, op_code code) {
     }, left, right);
 
     operands.push(result);
-
-        /*
-    if(is_binary_int_op(code)) {
-        std::int32_t l = to_int(left);
-        std::int32_t r = to_int(right);
-
-    }
-    using aops = arithmetic_ops<int>;
-
-    switch(code) {
-    case op_code::mul: operands.push(aops::mul(left, right)); break;
-    case op_code::div: operands.push(aops::div(left, right)); break;
-    case op_code::mod: operands.push(left % right); break;
-    case op_code::add: operands.push(aops::add(left, right)); break;
-    case op_code::sub: operands.push(aops::sub(left, right)); break;
-    case op_code::shl: operands.push(left << right); break;
-    case op_code::shr: operands.push(left >> right); break;
-    case op_code::lt:  operands.push(aops::lt(left, right)); break;
-    case op_code::lte: operands.push(aops::lte(left, right)); break;
-    case op_code::gt:  operands.push(aops::gt(left, right)); break;
-    case op_code::gte: operands.push(aops::gte(left, right)); break;
-    case op_code::eq:  operands.push(aops::eq(left, right)); break;
-    case op_code::neq: operands.push(aops::neq(left, right)); break;
-    case op_code::bit_and: operands.push(left & right); break;
-    case op_code::bit_xor: operands.push(left ^ right); break;
-    case op_code::bit_or:  operands.push(left | right); break;
-    case op_code::logic_and: operands.push(left && right); break;
-    case op_code::logic_or:  operands.push(left || right); break;
-    default:
-        throw std::logic_error("Currently unspported binary op: " + std::to_string(static_cast<int>(code)));
-    }
-    */
 }
 
 

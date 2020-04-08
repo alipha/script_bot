@@ -29,13 +29,6 @@ private:
         return std::string_view(raw_line.data() + p.first, p.second);
     }
 
-    /*
-    std::string_view translate_from(std::string_view str, const irc_message &other) const {
-        std::size_t offset = str.data() - other.raw_line.data();
-        return {raw_line.data() + offset, str.size()};
-    }
-    */
-
     pos_size_pair tokenize(std::size_t &pos);
     void parse();
 

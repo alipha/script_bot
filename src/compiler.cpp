@@ -12,7 +12,6 @@
 #include <vector>
 
 using namespace std::string_literals;
-using token = std::variant<std::string, op_code>;
 
 
 std::string parse_str_literal(std::string_view str);
@@ -36,7 +35,8 @@ ResultType to_postfix_impl(std::vector<std::string_view> token_list, Accumulator
     ResultType result;
 
     auto tokens = std::move(token_list);
-    tokens.push_back("");
+    if(tokens.back() != ";")
+        tokens.push_back(";");
 
     for(auto token : tokens) {
         operation_type op_type = lookup_operation(token, in_binary_context);
@@ -96,8 +96,8 @@ ResultType to_postfix_impl(std::vector<std::string_view> token_list, Accumulator
         op_codes.push(op_type.code);
     }
 
-    if(op_codes.size() != 1 || op_codes.top() != op_code::none) {
-        throw std::logic_error("Expected stack to only contain op_code::none. Size: " 
+    if(op_codes.size() != 1 || op_codes.top() != op_code::semicolon) {
+        throw std::logic_error("Expected stack to only contain op_code::semicolon. Size: " 
                 + std::to_string(op_codes.size()) + ", code: " + std::to_string(static_cast<int>(op_codes.top())));
     }
     /*
