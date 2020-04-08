@@ -1,5 +1,5 @@
 CXX      := g++-9.1
-CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror -std=c++17
+CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror -Wno-psabi -std=c++17
 LDFLAGS  := -pthread -lboost_system
 BUILD    := ./build
 OBJ_DIR  := $(BUILD)/objects

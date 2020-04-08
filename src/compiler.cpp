@@ -49,8 +49,10 @@ ResultType to_postfix_impl(std::vector<std::string_view> token_list, Accumulator
                 accum(result, token, op_code::var, false);
             else if(token[0] == '"' || token[0] == '\'') // TODO: char?
                 accum(result, token, op_code::str_lit, false);
+            else if(token.find_first_not_of("0123456789") == std::string_view::npos)
+                accum(result, token, op_code::int_lit, false);
             else if(std::isdigit(token[0]))
-                accum(result, token, op_code::int_lit, false); // TODO: float?
+                accum(result, token, op_code::float_lit, false);
             else
                 throw std::runtime_error("Invalid operand: "s + token);
                 
@@ -140,6 +142,9 @@ std::vector<char> compile(std::vector<std::string_view> token_list) {
                     break;
                 case op_code::int_lit:
                     buf.append(std::stoi(std::string(token)));  // TODO: from_chars?
+                    break;
+                case op_code::float_lit:
+                    buf.append(std::stod(std::string(token)));
                     break;
                 default:
                     throw std::logic_error(token + " is currently not supported"s);

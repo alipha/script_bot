@@ -30,7 +30,7 @@ std::string to_hex(const std::vector<char> &bytes) {
 std::string run(std::string_view code) {
     try {
         tokenizer t(std::string(code.data(), code.size()));
-        return std::to_string(execute(compile(t.tokens())));
+        return execute(compile(t.tokens()));
     } catch(std::exception &e) {
         return "Error: "s + e.what();
     }

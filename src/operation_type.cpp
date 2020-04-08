@@ -8,56 +8,91 @@
 #include <string_view>
 #include <utility>
 
+using namespace std::string_literals;
+
 
 operation_type operation_types[] = {
-    {"",    true,  0, associative::left,    0, op_code::none},
-    {"**",  true,  2, associative::left,  575, op_code::pow},
-    {"*",   true,  2, associative::left,  550, op_code::mul},
-    {"/",   true,  2, associative::left,  550, op_code::div},
-    {"%",   true,  2, associative::left,  550, op_code::mod},
-    {"+",   true,  2, associative::left,  500, op_code::add},
-    {"-",   true,  2, associative::left,  500, op_code::sub},
-    {"<<",  true,  2, associative::left,  475, op_code::shl},
-    {">>",  true,  2, associative::left,  475, op_code::shr},
-    {"<",   true,  2, associative::left,  450, op_code::lt},
-    {"<=",  true,  2, associative::left,  450, op_code::lte},
-    {">",   true,  2, associative::left,  450, op_code::gt},
-    {">=",  true,  2, associative::left,  450, op_code::gte},
-    {"==",  true,  2, associative::left,  450, op_code::eq},
-    {"!=",  true,  2, associative::left,  450, op_code::neq},
-    {"&",   true,  2, associative::left,  375, op_code::bit_and},
-    {"^",   true,  2, associative::left,  350, op_code::bit_xor},
-    {"|",   true,  2, associative::left,  325, op_code::bit_or},
-    {"&&",  true,  2, associative::left,  300, op_code::logic_and},
-    {"||",  true,  2, associative::left,  275, op_code::logic_or},
-    {"-",   false, 1, associative::right, 600, op_code::negate},
-    {"!",   false, 1, associative::right, 600, op_code::logic_not},
-    {"~",   false, 1, associative::right, 600, op_code::bit_not},
-    {"++",  false, 1, associative::right, 600, op_code::pre_inc},
-    {"--",  false, 1, associative::right, 600, op_code::pre_dec},
-    {"++",  true,  1, associative::left,  700, op_code::post_inc},
-    {"--",  true,  1, associative::left,  700, op_code::post_dec},
-    {".",   true,  2, associative::left,  900, op_code::dot},
-    {"=",   true,  2, associative::right, 200, op_code::assign},
-    {"+=",  true,  2, associative::right, 200, op_code::add_assign},
-    {"-=",  true,  2, associative::right, 200, op_code::sub_assign},
-    {"*=",  true,  2, associative::right, 200, op_code::mul_assign},
-    {"/=",  true,  2, associative::right, 200, op_code::div_assign},
-    {"%=",  true,  2, associative::right, 200, op_code::mod_assign},
-    {"&=",  true,  2, associative::right, 200, op_code::and_assign},
-    {"^=",  true,  2, associative::right, 200, op_code::xor_assign},
-    {"|=",  true,  2, associative::right, 200, op_code::or_assign},
-    {"<<=", true,  2, associative::right, 200, op_code::shl_assign},
-    {">>=", true,  2, associative::right, 200, op_code::shr_assign},
-    {"(",   true,  2, associative::left,  100, op_code::func_call},
-    {"(",   false, 1, associative::left,  100, op_code::left_paren},
-    {")",   true,  1, associative::left,  101, op_code::right_paren},
-    {"[",   true,  2, associative::left,  100, op_code::array_index},
-    {"[",   false, 1, associative::left,  100, op_code::array_start},
-    {"]",   true,  1, associative::left,  101, op_code::array_end},
-    {"{",   false, 1, associative::left,  100, op_code::map_start},
-    {"}",   true,  1, associative::left,  101, op_code::map_end}
+    {"",    true,  0, associative::left,    0, op_category::other,      op_code::none},
+    {".",   true,  2, associative::left,  900, op_category::other,      op_code::dot},
+    {"(",   true,  2, associative::left,  100, op_category::other,      op_code::func_call},
+    {"[",   true,  2, associative::left,  100, op_category::other,      op_code::array_index},
+    {"**",  true,  2, associative::left,  575, op_category::other,      op_code::pow},
+    {"<",   true,  2, associative::left,  450, op_category::comparison, op_code::lt},
+    {"<=",  true,  2, associative::left,  450, op_category::comparison, op_code::lte},
+    {">",   true,  2, associative::left,  450, op_category::comparison, op_code::gt},
+    {">=",  true,  2, associative::left,  450, op_category::comparison, op_code::gte},
+    {"==",  true,  2, associative::left,  450, op_category::comparison, op_code::eq},
+    {"!=",  true,  2, associative::left,  450, op_category::comparison, op_code::neq},
+    {"&&",  true,  2, associative::left,  300, op_category::comparison, op_code::logic_and},
+    {"||",  true,  2, associative::left,  275, op_category::comparison, op_code::logic_or},
+    {"%",   true,  2, associative::left,  550, op_category::integer,    op_code::mod},
+    {"&",   true,  2, associative::left,  375, op_category::integer,    op_code::bit_and},
+    {"^",   true,  2, associative::left,  350, op_category::integer,    op_code::bit_xor},
+    {"|",   true,  2, associative::left,  325, op_category::integer,    op_code::bit_or},
+    {"<<",  true,  2, associative::left,  475, op_category::integer,    op_code::shl},
+    {">>",  true,  2, associative::left,  475, op_category::integer,    op_code::shr},
+    {"+",   true,  2, associative::left,  500, op_category::arithmetic, op_code::add},
+    {"-",   true,  2, associative::left,  500, op_category::arithmetic, op_code::sub},
+    {"*",   true,  2, associative::left,  550, op_category::arithmetic, op_code::mul},
+    {"/",   true,  2, associative::left,  550, op_category::arithmetic, op_code::div},
+    {"=",   true,  2, associative::right, 200, op_category::assignment, op_code::assign},
+    {"%=",  true,  2, associative::right, 200, op_category::assignment, op_code::mod_assign},
+    {"&=",  true,  2, associative::right, 200, op_category::assignment, op_code::and_assign},
+    {"^=",  true,  2, associative::right, 200, op_category::assignment, op_code::xor_assign},
+    {"|=",  true,  2, associative::right, 200, op_category::assignment, op_code::or_assign},
+    {"<<=", true,  2, associative::right, 200, op_category::assignment, op_code::shl_assign},
+    {">>=", true,  2, associative::right, 200, op_category::assignment, op_code::shr_assign},
+    {"+=",  true,  2, associative::right, 200, op_category::assignment, op_code::add_assign},
+    {"-=",  true,  2, associative::right, 200, op_category::assignment, op_code::sub_assign},
+    {"*=",  true,  2, associative::right, 200, op_category::assignment, op_code::mul_assign},
+    {"/=",  true,  2, associative::right, 200, op_category::assignment, op_code::div_assign},
+    {"++",  false, 1, associative::right, 600, op_category::assignment, op_code::pre_inc},
+    {"--",  false, 1, associative::right, 600, op_category::assignment, op_code::pre_dec},
+    {"++",  true,  1, associative::left,  700, op_category::assignment, op_code::post_inc},
+    {"--",  true,  1, associative::left,  700, op_category::assignment, op_code::post_dec},
+    {"~",   false, 1, associative::right, 600, op_category::integer,    op_code::bit_not},
+    {"!",   false, 1, associative::right, 600, op_category::comparison, op_code::logic_not},
+    {"-",   false, 1, associative::right, 600, op_category::arithmetic, op_code::negate},
+    {"(",   false, 1, associative::left,  100, op_category::other,      op_code::left_paren},
+    {")",   true,  1, associative::left,  101, op_category::other,      op_code::right_paren},
+    {"[",   false, 1, associative::left,  100, op_category::other,      op_code::array_start},
+    {"]",   true,  1, associative::left,  101, op_category::other,      op_code::array_end},
+    {"{",   false, 1, associative::left,  100, op_category::other,      op_code::map_start},
+    {"}",   true,  1, associative::left,  101, op_category::other,      op_code::map_end}
 };
+
+
+void validate(const operation_type &type) {
+    op_code code = type.code;
+    if(type.operand_count == 2 && !is_binary_op(code))
+        throw std::logic_error(type.symbol + " has 2 operands but !is_binary_op"s);
+    if(type.operand_count != 2 && is_binary_op(code)) 
+        throw std::logic_error(type.symbol + " doesn't have 2 operands but is_binary_op"s);
+    if(type.operand_count == 1 && !is_unary_op(code))
+        throw std::logic_error(type.symbol + " has 1 operand but !is_unary_op"s);
+    if(type.operand_count != 1 && is_unary_op(code))
+        throw std::logic_error(type.symbol + " doesn't have 1 operand but is_unary_op"s);
+    if(type.operand_count == 2 && type.category == op_category::comparison && !is_binary_comp(code))
+        throw std::logic_error(type.symbol + " is binary and is comparison category but !is_binary_comp"s);
+    if((type.operand_count != 2 || type.category != op_category::comparison) && is_binary_comp(code))
+        throw std::logic_error(type.symbol + " is not binary or is not comparison category but is_binary_comp"s);
+    if(type.operand_count == 2 && type.category == op_category::integer && !is_binary_int_op(code))
+        throw std::logic_error(type.symbol + " is binary and is integer category but !is_binary_int_op"s);
+    if((type.operand_count != 2 || type.category != op_category::integer) && is_binary_int_op(code))
+        throw std::logic_error(type.symbol + " is not binary or is not integer category but is_binary_int_op"s);
+    if(type.operand_count == 2 && type.category == op_category::arithmetic && !is_binary_arithmetic(code))
+        throw std::logic_error(type.symbol + " is binary and is arithmetic category but !is_binary_arithmetic"s); 
+    if((type.operand_count != 2 || type.category != op_category::arithmetic) && is_binary_arithmetic(code))
+        throw std::logic_error(type.symbol + " is not binary or is not arithmetic category but is_binary_arithmetic"s);
+    if(type.operand_count == 2 && type.category == op_category::assignment && !is_binary_assignment(code))
+        throw std::logic_error(type.symbol + " is binary and is assignment category but !is_binary_assignment"s); 
+    if((type.operand_count != 2 || type.category != op_category::assignment) && is_binary_assignment(code))
+        throw std::logic_error(type.symbol + " is not binary or is not assignment category but is_binary_assignment"s);
+    if(type.operand_count == 1 && type.category == op_category::assignment && !is_increment(code))
+        throw std::logic_error(type.symbol + " is unary and is assignment category but !is_increment"s); 
+    if((type.operand_count != 1 || type.category != op_category::assignment) && is_increment(code))
+        throw std::logic_error(type.symbol + " is not unary or is not assignment category but is_increment"s);  
+}
 
 
 std::map<std::pair<std::string_view, bool>, operation_type> load_operation_types() {
@@ -70,10 +105,19 @@ std::map<std::pair<std::string_view, bool>, operation_type> load_operation_types
     int code_index = 0;
 
     for(auto &t : types) {
-        if(t.code != static_cast<op_code>(code_index++))
-            throw std::logic_error(t.symbol + std::string(" is not in the correct order in operation_types. Index: " + std::to_string(code_index - 1)));
+        if(t.code != static_cast<op_code>(code_index))
+            throw std::logic_error(t.symbol + " is not in the correct order in operation_types. Index: "s + std::to_string(code_index));
+        validate(t);
+
+        if(t.category == op_category::assignment && t.operand_count == 2 && t.code != op_code::assign) {
+            std::string_view symbol = t.symbol;
+            symbol.remove_suffix(1);
+            if(types[code_index - 11].symbol != symbol)
+                throw std::logic_error(t.symbol + " is not 11 op_codes after "s + symbol);
+        }
 
         type_map[std::pair(t.symbol, t.in_binary_context)] = t;
+        code_index++;
     }
 
     return type_map;
