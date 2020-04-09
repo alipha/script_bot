@@ -16,7 +16,6 @@ enum class op_category : std::uint8_t {
 
 enum class op_code : std::uint8_t {
     none = 0,
-    semicolon,
     dot,
     func_call,
     array_index,
@@ -28,6 +27,7 @@ enum class op_code : std::uint8_t {
     neq,
     logic_and,
     logic_or,
+    semicolon,
     mod,
     bit_and,
     bit_xor,
@@ -66,7 +66,8 @@ enum class op_code : std::uint8_t {
     map_end,
     count,
 
-    var,
+    global_var,
+    local_var,
     int_lit,
     float_lit,
     str_lit,
@@ -80,6 +81,9 @@ inline bool operator>(op_code a, op_code b)  { return static_cast<int>(a) > stat
 inline bool operator>=(op_code a, op_code b) { return static_cast<int>(a) >= static_cast<int>(b); }
 inline bool operator!=(op_code a, op_code b) { return static_cast<int>(a) != static_cast<int>(b); }
 inline bool operator==(op_code a, op_code b) { return static_cast<int>(a) == static_cast<int>(b); }
+
+
+constexpr int assign_ops_offset = static_cast<int>(op_code::mod_assign) - static_cast<int>(op_code::mod);
 
 
 enum associative : std::uint8_t {
@@ -105,7 +109,7 @@ operation_type lookup_operation(op_code code);
 
 
 inline bool is_binary_op(op_code code) {
-    return code >= op_code::semicolon && code <= op_code::div_assign;
+    return code >= op_code::dot && code <= op_code::div_assign;
 }
 
 inline bool is_unary_op(op_code code) {

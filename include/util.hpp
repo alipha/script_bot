@@ -1,10 +1,17 @@
 #ifndef LIPH_UTIL_HPP
 #define LIPH_UTIL_HPP
 
+#include <stdexcept>
 #include <stack>
 #include <string>
 #include <string_view>
 #include <variant>
+
+constexpr bool debug = false
+#ifdef DEBUG
+    || true
+#endif
+    ;
 
 
 template<typename Char, typename Traits, typename Alloc>
@@ -23,6 +30,10 @@ std::basic_string<Char, Traits, Alloc> operator+(std::basic_string_view<Char, Tr
 
 template<typename T>
 T pop(std::stack<T> &s) {
+    if constexpr(debug) {
+        if(s.empty())
+            throw std::logic_error("calling pop() on empty stack!");
+    }
     T value = s.top();
     s.pop();
     return value;

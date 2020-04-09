@@ -5,6 +5,7 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 
@@ -22,10 +23,13 @@ private:
     static std::string parse_str_literal(std::string_view str);
     static bool has_lower_precedence(op_code current_code, op_code top_code);
 
+    std::uint8_t local_var_index(std::string_view name);
+
     template<typename ResultType, typename Accumulator>
-    static ResultType to_postfix_impl(std::vector<std::string_view> token_list, Accumulator accum);
+    std::size_t to_postfix_impl(std::vector<std::string_view> token_list, ResultType &result, Accumulator accum);
 
     memory *mem;
+    std::unordered_map<std::string, std::uint8_t> local_var_indexes;
 };
 
 

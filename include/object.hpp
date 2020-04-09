@@ -20,7 +20,7 @@ using string_ref = std::shared_ptr<std::string>;
 using array_ref = std::shared_ptr<std::vector<object>>;
 //using map_ref = std::shared_ptr<std::unordered_map<std::string, object>>;
 using lvalue_ref = std::shared_ptr<object>;
-using local_ref = object*;
+using local_ref = object*;  // or std::size_t?
 
 
 class object {

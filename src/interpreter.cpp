@@ -1,4 +1,5 @@
 #include "interpreter.hpp"
+#include "memory.hpp"
 #include "memory_buffer.hpp"
 #include "object.hpp"
 #include "operation_type.hpp"
@@ -13,7 +14,6 @@
 #include <sstream>
 #include <variant>
 #include <vector>
-
 
 /*
 template<typename Func>
@@ -95,8 +95,10 @@ object binary_arithmetic(op_code code, const object &left, const object &right) 
 
 
 std::string interpreter::execute(const std::vector<char> &program) {
-    memory_buffer<true> buffer(program);    // TODO: false?
+    memory_buffer<debug> buffer(program);
     std::stack<object> operands;
+
+    mem->push_frame(*buffer.read<std::uint8_t>());
 
     while(buffer.position() < buffer.size()) {
         op_code code = *buffer.read<op_code>();
@@ -105,8 +107,11 @@ std::string interpreter::execute(const std::vector<char> &program) {
         case op_code::left_paren:
         case op_code::right_paren:
             break;
-        case op_code::var:
-            throw std::logic_error("var is currently unsupported");
+        case op_code::global_var:
+            throw std::logic_error("global_var is currently unsupported");
+        case op_code::local_var:
+            operands.push(object(mem->get_local_var(*buffer.read<std::uint8_t>())));
+            break;
         case op_code::int_lit:
             operands.push(object(*buffer.read<std::int32_t>()));
             break;
@@ -127,11 +132,13 @@ std::string interpreter::execute(const std::vector<char> &program) {
         }
     }
 
-    if(operands.size() != 1) {  // TODO: remove?
-        throw std::logic_error("Expected one operand in stack. size: " + std::to_string(operands.size()));
+    if constexpr(debug) {
+        if(operands.size() != 1) {
+            throw std::logic_error("Expected one operand in stack. size: " + std::to_string(operands.size()));
+        }
     }
 
-    return std::visit([](auto &&value) -> std::string {
+    std::string result = std::visit([](auto &&value) -> std::string {
         using T = std::decay_t<decltype(value)>;
         if constexpr(std::is_same_v<T, std::monostate>) {
             return "null";
@@ -141,18 +148,28 @@ std::string interpreter::execute(const std::vector<char> &program) {
             return ss.str(); 
         }
     }, operands.top().value());
+
+    mem->pop_frame();
+    return result;
 }
 
 
 void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) {
-    if(operands.size() < 2) {  // TODO: remove?
-        throw std::logic_error("execute_binary_op with " + std::to_string(operands.size()) + " operands. op_code: "
-                + std::to_string(static_cast<int>(code)));
+    if constexpr(debug) {
+        if(operands.size() < 2) {
+            throw std::logic_error("execute_binary_op with " + std::to_string(operands.size()) 
+                    + " operands. op_code: " + std::to_string(static_cast<int>(code)));
+        }
     }
 
+    bool is_assign = is_binary_assignment(code);
     object right = pop(operands);
-    object left = pop(operands);
+    object left = is_assign ? operands.top() : pop(operands);
     object result;
+
+    if(is_assign) {
+        code = static_cast<op_code>(static_cast<int>(code) - assign_ops_offset);
+    }
 
     if(code == op_code::semicolon)
         result = right;
@@ -165,14 +182,20 @@ void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) 
     else
         throw std::logic_error("Currently unspported binary op: " + std::to_string(static_cast<int>(code)));
 
-    operands.push(result);
+    if(is_assign) {
+        *std::get<lvalue_ref>(left.get()) = result;
+    } else {
+        operands.push(result);
+    }
 }
 
 
 void interpreter::execute_unary_op(std::stack<object> &operands, op_code code) {
-    if(operands.empty()) {  // TODO: remove?
-        throw std::logic_error("execute_unary_op with zero operands. op_code: "
-                + std::to_string(static_cast<int>(code)));
+    if constexpr(debug) {
+        if(operands.empty()) {
+            throw std::logic_error("execute_unary_op with zero operands. op_code: "
+                    + std::to_string(static_cast<int>(code)));
+        }
     }
 
     object operand = pop(operands);

@@ -2,6 +2,7 @@
 #include "compiler.hpp"
 #include "interpreter.hpp"
 #include "irc.hpp"
+#include "memory.hpp"
 #include "util.hpp"
 
 #include <iostream>
@@ -38,8 +39,9 @@ std::string run(compiler &c, interpreter &i, std::string_view code) {
 
 
 int main(int argc, char* argv[]) {
-    compiler c(nullptr);
-    interpreter i(nullptr);
+    memory m;
+    compiler c(&m);
+    interpreter i(&m);
 
     if(argc > 1 && argv[1] == std::string_view("irc")) {
         irc_client irc;

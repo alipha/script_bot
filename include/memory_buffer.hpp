@@ -85,8 +85,10 @@ public:
         pos += amount;  // TODO: check for overflow?
         bounds_check(0); 
     }
-
+    
+    std::vector<char> &buffer() { return buf; }
     const std::vector<char> &buffer() const { return buf; }
+
     std::size_t position() const { return pos; }
     std::size_t size() const { return buf.size(); }
 
