@@ -14,10 +14,63 @@
 using namespace std::string_literals;
 
 
-std::string parse_str_literal(std::string_view str);
+std::string compiler::to_postfix(std::vector<std::string_view> token_list) {
+    return to_postfix_impl<std::string>(std::move(token_list), 
+            [](std::string &result, std::string_view token, op_code, bool) {
+                result += token;
+                result += " ";
+            });
+}
 
 
-bool has_lower_precedence(op_code current_code, op_code top_code) {
+std::vector<char> compiler::compile(std::vector<std::string_view> token_list) { 
+    memory_buffer result = to_postfix_impl<memory_buffer<true>>(std::move(token_list),
+            [](memory_buffer<true> &buf, std::string_view token, op_code code, bool is_operator) {
+                buf.append(code);
+
+                if(is_operator)
+                    return;
+
+                switch(code) {
+                case op_code::str_lit:
+                    buf.append(parse_str_literal(token));
+                    break;
+                case op_code::var:
+                    buf.append(token);
+                    break;
+                case op_code::int_lit:
+                    buf.append(std::stoi(std::string(token)));  // TODO: from_chars?
+                    break;
+                case op_code::float_lit:
+                    buf.append(std::stod(std::string(token)));
+                    break;
+                default:
+                    throw std::logic_error(token + " is currently not supported"s);
+                }
+            });
+
+    return result.buffer();
+}
+
+
+std::string compiler::parse_str_literal(std::string_view str) {
+    std::string result;
+    bool backslash = false;
+
+    for(std::size_t i = 1; i < str.size() - 1; ++i) {
+        if(!backslash && str[i] == '\\') {
+            backslash = true;
+        } else {
+            backslash = false;
+            result += str[i];
+        }
+    }
+
+    return result;
+}
+
+
+bool compiler::has_lower_precedence(op_code current_code, op_code top_code) {
     operation_type current = lookup_operation(current_code);
     operation_type top = lookup_operation(top_code);
 
@@ -27,7 +80,7 @@ bool has_lower_precedence(op_code current_code, op_code top_code) {
 
 
 template<typename ResultType, typename Accumulator>
-ResultType to_postfix_impl(std::vector<std::string_view> token_list, Accumulator accum) {
+ResultType compiler::to_postfix_impl(std::vector<std::string_view> token_list, Accumulator accum) {
     std::stack<std::string_view> token_pairs;
     std::stack<op_code> op_codes;
     bool in_binary_context = false;
@@ -45,7 +98,9 @@ ResultType to_postfix_impl(std::vector<std::string_view> token_list, Accumulator
             if(in_binary_context)
                 throw std::runtime_error("`"s + token + "` was not expected at this point.");
 
-            if(tokenizer::is_identifier(token[0]))
+            if(token == "null")
+                accum(result, token, op_code::null_lit, true);
+            else if(tokenizer::is_identifier(token[0]))
                 accum(result, token, op_code::var, false);
             else if(token[0] == '"' || token[0] == '\'') // TODO: char?
                 accum(result, token, op_code::str_lit, false);
@@ -100,72 +155,9 @@ ResultType to_postfix_impl(std::vector<std::string_view> token_list, Accumulator
         throw std::logic_error("Expected stack to only contain op_code::semicolon. Size: " 
                 + std::to_string(op_codes.size()) + ", code: " + std::to_string(static_cast<int>(op_codes.top())));
     }
-    /*
-    while(!op_codes.empty()) {
-        result += lookup_operation(op_codes.top()).symbol;
-        result += " ";
-        op_codes.pop();
-    }
-    */
 
     if(!token_pairs.empty()) {
         throw std::logic_error("Mismatched "s + pop(token_pairs));
-    }
-
-    return result;
-}
-
-
-std::string to_postfix(std::vector<std::string_view> token_list) {
-    return to_postfix_impl<std::string>(std::move(token_list), 
-            [](std::string &result, std::string_view token, op_code, bool) {
-                result += token;
-                result += " ";
-            });
-}
-
-
-std::vector<char> compile(std::vector<std::string_view> token_list) { 
-    memory_buffer result = to_postfix_impl<memory_buffer<true>>(std::move(token_list),
-            [](memory_buffer<true> &buf, std::string_view token, op_code code, bool is_operator) {
-                buf.append(code);
-
-                if(is_operator)
-                    return;
-
-                switch(code) {
-                case op_code::str_lit:
-                    buf.append(parse_str_literal(token));
-                    break;
-                case op_code::var:
-                    buf.append(token);
-                    break;
-                case op_code::int_lit:
-                    buf.append(std::stoi(std::string(token)));  // TODO: from_chars?
-                    break;
-                case op_code::float_lit:
-                    buf.append(std::stod(std::string(token)));
-                    break;
-                default:
-                    throw std::logic_error(token + " is currently not supported"s);
-                }
-            });
-
-    return result.buffer();
-}
-
-
-std::string parse_str_literal(std::string_view str) {
-    std::string result;
-    bool backslash = false;
-
-    for(std::size_t i = 1; i < str.size() - 1; ++i) {
-        if(!backslash && str[i] == '\\') {
-            backslash = true;
-        } else {
-            backslash = false;
-            result += str[i];
-        }
     }
 
     return result;

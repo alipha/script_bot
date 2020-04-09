@@ -27,10 +27,10 @@ std::string to_hex(const std::vector<char> &bytes) {
 }
 
 
-std::string run(std::string_view code) {
+std::string run(compiler &c, interpreter &i, std::string_view code) {
     try {
         tokenizer t(std::string(code.data(), code.size()));
-        return execute(compile(t.tokens()));
+        return i.execute(c.compile(t.tokens()));
     } catch(std::exception &e) {
         return "Error: "s + e.what();
     }
@@ -38,6 +38,9 @@ std::string run(std::string_view code) {
 
 
 int main(int argc, char* argv[]) {
+    compiler c(nullptr);
+    interpreter i(nullptr);
+
     if(argc > 1 && argv[1] == std::string_view("irc")) {
         irc_client irc;
         irc.login();
@@ -51,7 +54,8 @@ int main(int argc, char* argv[]) {
             if(msg.sender_nick() == "Alipha" && msg.target() == "LiphBot") {
                 irc.write(msg.message());
             } else if(starts_with(msg.message(), "!calc ")) {
-                irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": " + run(msg.message().substr(6)));
+                irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": " + 
+                        run(c, i, msg.message().substr(6)));
             }
         }
     }
@@ -66,9 +70,9 @@ int main(int argc, char* argv[]) {
             std::cout << '"' << token << '"' << std::endl;
 
         std::cout << std::endl;
-        std::cout << to_postfix(t.tokens()) << std::endl;
-        std::cout << to_hex(compile(t.tokens())) << std::endl;
-        std::cout << "Result: " << execute(compile(t.tokens())) << std::endl;
+        std::cout << c.to_postfix(t.tokens()) << std::endl;
+        std::cout << to_hex(c.compile(t.tokens())) << std::endl;
+        std::cout << "Result: " << i.execute(c.compile(t.tokens())) << std::endl;
     }
 
     return 0;

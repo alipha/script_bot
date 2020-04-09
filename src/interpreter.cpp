@@ -1,21 +1,19 @@
 #include "interpreter.hpp"
 #include "memory_buffer.hpp"
+#include "object.hpp"
 #include "operation_type.hpp"
 #include "util.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <sstream>
 #include <variant>
 #include <vector>
 
-
-std::int32_t to_int(const value_type &value) {
-    return std::visit([](auto &&arg) { return static_cast<std::int32_t>(arg); }, value);
-}
 
 /*
 template<typename Func>
@@ -33,13 +31,72 @@ value_type do_with_doubles(const value_type &left, const value_type &right, Func
 }
 */
 
-void execute_binary_op(std::stack<value_type> &operands, op_code code);
-void execute_unary_op(std::stack<value_type> &operands, op_code code);
+bool binary_comp(op_code code, const object &left, const object &right) {
+    auto l = left.to_optional_int();
+    auto r = right.to_optional_int();
+
+    switch(code) {
+    case op_code::lt:  return l < r;
+    case op_code::lte: return l <= r;
+    case op_code::gt:  return l > r;
+    case op_code::gte: return l >= r;
+    case op_code::eq:  return l == r;
+    case op_code::neq: return l != r;
+    case op_code::logic_and: return l.value_or(0) && r.value_or(0);
+    case op_code::logic_or:  return l.value_or(0) || r.value_or(0);
+    default:
+        throw std::logic_error("Invalid binary_comp op: " + std::to_string(static_cast<int>(code)));
+    }
+}
 
 
-std::string execute(const std::vector<char> &program) {
+std::int32_t binary_int_op(op_code code, const object &left, const object &right) {
+    std::int32_t l = left.to_int();
+    std::int32_t r = right.to_int();
+    
+    switch(code) {
+    case op_code::mod: return l % r;
+    case op_code::bit_and: return l & r;
+    case op_code::bit_xor: return l ^ r;
+    case op_code::bit_or: return l | r;
+    case op_code::shl: return l << r;
+    case op_code::shr: return l >> r;
+    default:
+        throw std::logic_error("Invalid binary_int_op: " + std::to_string(static_cast<int>(code)));
+    }
+}
+
+
+object binary_arithmetic(op_code code, const object &left, const object &right) {
+    return std::visit([code](auto &&l, auto &&r) -> object::type {
+        using LeftT = std::remove_reference_t<decltype(l)>;
+        using RightT = std::remove_reference_t<decltype(r)>;
+
+        switch(code) {
+        case op_code::pow: return std::pow(l, r);
+        case op_code::add: return l + r;
+        case op_code::sub: return l - r;
+        case op_code::mul: return l * r;
+        case op_code::div: 
+            if constexpr(std::is_same_v<LeftT, std::int32_t> && std::is_same_v<RightT, std::int32_t>) {
+                if(r == 0)
+                    throw std::runtime_error("Division by zero");
+                if(l == std::numeric_limits<std::int32_t>::min() && r == -1)
+                    throw std::runtime_error("Overflow computing: " 
+                            + std::to_string(std::numeric_limits<std::int32_t>::min()) + " / -1");
+            }
+            return l / r;
+        default:
+            throw std::logic_error("Invalid binary_arithmetic op: " + std::to_string(static_cast<int>(code)));
+        }
+    }, left.non_null_value(), right.non_null_value());
+}
+
+
+
+std::string interpreter::execute(const std::vector<char> &program) {
     memory_buffer<true> buffer(program);    // TODO: false?
-    std::stack<value_type> operands;
+    std::stack<object> operands;
 
     while(buffer.position() < buffer.size()) {
         op_code code = *buffer.read<op_code>();
@@ -51,10 +108,13 @@ std::string execute(const std::vector<char> &program) {
         case op_code::var:
             throw std::logic_error("var is currently unsupported");
         case op_code::int_lit:
-            operands.push(*buffer.read<std::int32_t>());
+            operands.push(object(*buffer.read<std::int32_t>()));
             break;
         case op_code::float_lit:
-            operands.push(*buffer.read<double>());
+            operands.push(object(*buffer.read<double>()));
+            break;
+        case op_code::null_lit:
+            operands.push(object());
             break;
         case op_code::str_lit:
             throw std::logic_error("str_lit is currently unsupported");
@@ -71,108 +131,53 @@ std::string execute(const std::vector<char> &program) {
         throw std::logic_error("Expected one operand in stack. size: " + std::to_string(operands.size()));
     }
 
-    return std::visit([](auto &&value) {
-        std::stringstream ss;
-        ss << value;
-        return ss.str(); 
-    }, operands.top());
-}
-
-
-template<typename Left, typename Right>
-bool binary_comp(op_code code, Left &&l, Right &&r) {
-    switch(code) {
-    case op_code::lt:  return l < r;
-    case op_code::lte: return l <= r;
-    case op_code::gt:  return l > r;
-    case op_code::gte: return l >= r;
-    case op_code::eq:  return l == r;
-    case op_code::neq: return l != r;
-    case op_code::logic_and: return l && r;
-    case op_code::logic_or:  return l || r;
-    default:
-        throw std::logic_error("Invalid binary_comp op: " + std::to_string(static_cast<int>(code)));
-    }
-}
-
-
-template<typename Left, typename Right>
-std::int32_t binary_int_op(op_code code, Left &&left, Right &&right) {
-    auto l = static_cast<std::int32_t>(left);
-    auto r = static_cast<std::int32_t>(right);
-    
-    switch(code) {
-    case op_code::mod: return l % r;
-    case op_code::bit_and: return l & r;
-    case op_code::bit_xor: return l ^ r;
-    case op_code::bit_or: return l | r;
-    case op_code::shl: return l << r;
-    case op_code::shr: return l >> r;
-    default:
-        throw std::logic_error("Invalid binary_int_op: " + std::to_string(static_cast<int>(code)));
-    }
-}
-
-
-template<typename Left, typename Right>
-value_type binary_arithmetic(op_code code, Left &&l, Right &&r) {
-    using LeftT = std::decay_t<Left>;
-    using RightT = std::decay_t<Right>;
-
-    switch(code) {
-    case op_code::pow: return std::pow(l, r);
-    case op_code::add: return l + r;
-    case op_code::sub: return l - r;
-    case op_code::mul: return l * r;
-    case op_code::div: 
-        if constexpr(std::is_same_v<LeftT, std::int32_t> && std::is_same_v<RightT, std::int32_t>) {
-            if(r == 0)
-                throw std::runtime_error("Division by zero");
-            if(l == std::numeric_limits<std::int32_t>::min() && r == -1)
-                throw std::runtime_error("Overflow computing: " 
-                        + std::to_string(std::numeric_limits<std::int32_t>::min()) + " / -1");
+    return std::visit([](auto &&value) -> std::string {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr(std::is_same_v<T, std::monostate>) {
+            return "null";
+        } else {
+            std::stringstream ss;
+            ss << value;
+            return ss.str(); 
         }
-        return l / r;
-    default:
-        throw std::logic_error("Invalid binary_arithmetic op: " + std::to_string(static_cast<int>(code)));
-    }
+    }, operands.top().value());
 }
 
 
-void execute_binary_op(std::stack<value_type> &operands, op_code code) {
+void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) {
     if(operands.size() < 2) {  // TODO: remove?
         throw std::logic_error("execute_binary_op with " + std::to_string(operands.size()) + " operands. op_code: "
                 + std::to_string(static_cast<int>(code)));
     }
 
-    value_type right = pop(operands);
-    value_type left = pop(operands);
+    object right = pop(operands);
+    object left = pop(operands);
+    object result;
 
-    value_type result = std::visit([code](auto &&l, auto &&r) -> value_type {
-        if(code == op_code::semicolon)
-            return r;
-        if(is_binary_comp(code))
-            return static_cast<std::int32_t>(binary_comp(code, l, r));
-        if(is_binary_int_op(code))
-            return binary_int_op(code, l, r);
-        if(is_binary_arithmetic(code))
-            return binary_arithmetic(code, l, r);
+    if(code == op_code::semicolon)
+        result = right;
+    else if(is_binary_comp(code))
+        result = static_cast<std::int32_t>(binary_comp(code, left, right));
+    else if(is_binary_int_op(code))
+        result = binary_int_op(code, left, right);
+    else if(is_binary_arithmetic(code))
+        result = binary_arithmetic(code, left, right);
+    else
         throw std::logic_error("Currently unspported binary op: " + std::to_string(static_cast<int>(code)));
-    }, left, right);
 
     operands.push(result);
 }
 
 
-void execute_unary_op(std::stack<value_type> &operands, op_code code) {
+void interpreter::execute_unary_op(std::stack<object> &operands, op_code code) {
     if(operands.empty()) {  // TODO: remove?
         throw std::logic_error("execute_unary_op with zero operands. op_code: "
                 + std::to_string(static_cast<int>(code)));
     }
 
-    value_type operand = pop(operands);
+    object operand = pop(operands);
 
-    value_type result = std::visit([code](auto &&v) -> value_type {
+    object result = std::visit([code](auto &&v) -> object::type {
         switch(code) {
         case op_code::negate:    return -v;
         case op_code::bit_not:   return ~static_cast<std::int32_t>(v);
@@ -180,7 +185,7 @@ void execute_unary_op(std::stack<value_type> &operands, op_code code) {
         default:
             throw std::logic_error("Currently unsupported unary op: " + std::to_string(static_cast<int>(code)));
         }
-    }, operand);
+    }, operand.non_null_value());
 
     operands.push(result);
 }

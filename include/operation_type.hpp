@@ -69,7 +69,8 @@ enum class op_code : std::uint8_t {
     var,
     int_lit,
     float_lit,
-    str_lit
+    str_lit,
+    null_lit
 };
 
 
