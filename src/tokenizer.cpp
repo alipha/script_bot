@@ -42,7 +42,8 @@ void tokenizer::tokenize() {
                 token_stage = stage::whitespace;
                 finish_token = true;
             }
-        } else if((ch >= '0' && ch <= '9') || (token_stage == stage::number && ch == '.')) {
+        } else if((ch >= '0' && ch <= '9') || 
+                (token_stage == stage::number && (ch == '.' || ch == 'u' || ch == 'U'))) {
             if(token_stage != stage::identifier && token_stage != stage::number) {
                 token_stage = stage::number;
                 finish_token = true;

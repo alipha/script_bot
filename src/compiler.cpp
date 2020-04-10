@@ -6,13 +6,48 @@
 
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <stack>
 #include <stdexcept>
+#include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
 using namespace std::string_literals;
+
+
+/*
+unsigned stou(std::string const & str, size_t * idx = 0, int base = 10) {
+    unsigned long result = std::stoul(str, idx, base);
+    if (result > std::numeric_limits<unsigned>::max()) {
+        throw std::out_of_range("stou");
+    }
+    return result;
+}
+
+
+template<typename Int>
+Int string_to(std::string const & str, size_t * idx = 0, int base = 10) {
+    static_assert(std::is_integral_v<Int>, "string_to only works with integer types");
+    if constexpr(std::is_unsigned_v<Int>) {
+        if constexpr(sizeof(Int) == sizeof(unsigned int))
+            return std::stou(str, idx, base);
+        else if constexpr(sizeof(Int) == sizeof(unsigned long))
+            return std::stoul(str, idx, base);
+        else if constexpr(sizeof(Int) == sizeof(unsigned long long))
+            return std::stoull(str, idx, base);
+    } else {
+        if constexpr(sizeof(Int) == sizeof(int))
+            return std::stoi(str, idx, base);
+        else if constexpr(sizeof(Int) == sizeof(long))
+            return std::stol(str, idx, base);
+        else if constexpr(sizeof(Int) == sizeof(long long))
+            return std::stoll(str, idx, base);
+    }
+}
+*/
 
 
 std::string compiler::to_postfix(std::vector<std::string_view> token_list) {
@@ -48,7 +83,10 @@ std::vector<char> compiler::compile(std::vector<std::string_view> token_list) {
                 buf.append(this->local_var_index(token));
                 break;
             case op_code::int_lit:
-                buf.append(std::stoi(std::string(token)));  // TODO: from_chars?
+                buf.append(std::stoll(std::string(token)));  // TODO: from_chars?
+                break;
+            case op_code::uint_lit:
+                buf.append(std::stoull(std::string(token)));  // TODO: from_chars?
                 break;
             case op_code::float_lit:
                 buf.append(std::stod(std::string(token)));
@@ -120,6 +158,8 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
                 accum(result, token, op_code::local_var, false);    // TODO: global_var
             else if(token[0] == '"' || token[0] == '\'') // TODO: char?
                 accum(result, token, op_code::str_lit, false);
+            else if(std::isdigit(token[0]) && (token.back() == 'u' || token.back() == 'U'))
+                accum(result, token, op_code::uint_lit, false);
             else if(token.find_first_not_of("0123456789") == std::string_view::npos)
                 accum(result, token, op_code::int_lit, false);
             else if(std::isdigit(token[0]))

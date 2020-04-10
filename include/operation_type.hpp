@@ -57,6 +57,7 @@ enum class op_code : std::uint8_t {
     post_dec,
     bit_not,
     logic_not,
+    plus,
     negate,
     left_paren,
     right_paren,
@@ -69,6 +70,9 @@ enum class op_code : std::uint8_t {
     global_var,
     local_var,
     int_lit,
+    //long_lit,
+    uint_lit,
+    //ulong_lit,
     float_lit,
     str_lit,
     null_lit

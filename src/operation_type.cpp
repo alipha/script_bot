@@ -55,13 +55,14 @@ operation_type operation_types[] = {
     {"--",  true,  1, associative::left,  700, op_category::assignment, op_code::post_dec},
     {"~",   false, 1, associative::right, 600, op_category::integer,    op_code::bit_not},
     {"!",   false, 1, associative::right, 600, op_category::comparison, op_code::logic_not},
+    {"+",   false, 1, associative::right, 600, op_category::integer,    op_code::plus},
     {"-",   false, 1, associative::right, 600, op_category::arithmetic, op_code::negate},
-    {"(",   false, 1, associative::left,  100, op_category::other,      op_code::left_paren},
-    {")",   true,  1, associative::left,  101, op_category::other,      op_code::right_paren},
-    {"[",   false, 1, associative::left,  100, op_category::other,      op_code::array_start},
-    {"]",   true,  1, associative::left,  101, op_category::other,      op_code::array_end},
-    {"{",   false, 1, associative::left,  100, op_category::other,      op_code::map_start},
-    {"}",   true,  1, associative::left,  101, op_category::other,      op_code::map_end}
+    {"(",   false, 1, associative::left,  101, op_category::other,      op_code::left_paren},
+    {")",   true,  1, associative::left,  100, op_category::other,      op_code::right_paren},
+    {"[",   false, 1, associative::left,  101, op_category::other,      op_code::array_start},
+    {"]",   true,  1, associative::left,  100, op_category::other,      op_code::array_end},
+    {"{",   false, 1, associative::left,  101, op_category::other,      op_code::map_start},
+    {"}",   true,  1, associative::left,  100, op_category::other,      op_code::map_end}
 };
 
 

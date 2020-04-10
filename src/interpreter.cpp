@@ -31,39 +31,64 @@ value_type do_with_doubles(const value_type &left, const value_type &right, Func
 }
 */
 
-bool binary_comp(op_code code, const object &left, const object &right) {
-    auto l = left.to_optional_int();
-    auto r = right.to_optional_int();
 
-    switch(code) {
-    case op_code::lt:  return l < r;
-    case op_code::lte: return l <= r;
-    case op_code::gt:  return l > r;
-    case op_code::gte: return l >= r;
-    case op_code::eq:  return l == r;
-    case op_code::neq: return l != r;
-    case op_code::logic_and: return l.value_or(0) && r.value_or(0);
-    case op_code::logic_or:  return l.value_or(0) || r.value_or(0);
-    default:
-        throw std::logic_error("Invalid binary_comp op: " + std::to_string(static_cast<int>(code)));
-    }
+template<typename Int>
+auto to_optional_int(Int &&x) {
+    using T = std::decay_t<Int>;
+    if constexpr(std::is_same_v<T, std::monostate>)
+        return std::optional<std::int64_t>();
+    else
+        return std::optional<T>(x);
+}
+
+template<typename Int>
+auto to_int(Int &&x) {
+    using T = std::decay_t<Int>;
+    if constexpr(std::is_same_v<T, std::uint64_t>)
+        return x;
+    else
+        return static_cast<std::int64_t>(x);
 }
 
 
-std::int32_t binary_int_op(op_code code, const object &left, const object &right) {
-    std::int32_t l = left.to_int();
-    std::int32_t r = right.to_int();
+bool binary_comp(op_code code, const object &left, const object &right) {
+    auto l = left.to_nullable_int();
+    auto r = right.to_nullable_int();
+
+    return std::visit([code](auto &&left, auto &&right) {
+        auto l = to_optional_int(left);
+        auto r = to_optional_int(right);
+
+        switch(code) {
+        case op_code::lt:  return l < r;
+        case op_code::lte: return l <= r;
+        case op_code::gt:  return l > r;
+        case op_code::gte: return l >= r;
+        case op_code::eq:  return l == r;
+        case op_code::neq: return l != r;
+        case op_code::logic_and: return l.value_or(0) && r.value_or(0);
+        case op_code::logic_or:  return l.value_or(0) || r.value_or(0);
+        default:
+            throw std::logic_error("Invalid binary_comp op: " + std::to_string(static_cast<int>(code)));
+        }
+    }, left.to_nullable_int(), right.to_nullable_int());
+}
+
+
+object binary_int_op(op_code code, const object &left, const object &right) {
     
-    switch(code) {
-    case op_code::mod: return l % r;
-    case op_code::bit_and: return l & r;
-    case op_code::bit_xor: return l ^ r;
-    case op_code::bit_or: return l | r;
-    case op_code::shl: return l << r;
-    case op_code::shr: return l >> r;
-    default:
-        throw std::logic_error("Invalid binary_int_op: " + std::to_string(static_cast<int>(code)));
-    }
+    return std::visit([code](auto &&l, auto &&r) -> object::type {
+        switch(code) {
+        case op_code::mod: return l % r;
+        case op_code::bit_and: return l & r;
+        case op_code::bit_xor: return l ^ r;
+        case op_code::bit_or: return l | r;
+        case op_code::shl: return l << r;
+        case op_code::shr: return l >> r;
+        default:
+            throw std::logic_error("Invalid binary_int_op: " + std::to_string(static_cast<int>(code)));
+        }
+    }, left.to_int(), right.to_int());
 }
 
 
@@ -78,12 +103,14 @@ object binary_arithmetic(op_code code, const object &left, const object &right) 
         case op_code::sub: return l - r;
         case op_code::mul: return l * r;
         case op_code::div: 
-            if constexpr(std::is_same_v<LeftT, std::int32_t> && std::is_same_v<RightT, std::int32_t>) {
+            if constexpr(std::is_integral_v<LeftT> && std::is_integral_v<RightT>) {
                 if(r == 0)
                     throw std::runtime_error("Division by zero");
-                if(l == std::numeric_limits<std::int32_t>::min() && r == -1)
+            }
+            if constexpr(std::is_same_v<LeftT, std::int64_t> && std::is_same_v<RightT, std::int64_t>) {
+                if(l == std::numeric_limits<std::int64_t>::min() && r == -1)
                     throw std::runtime_error("Overflow computing: " 
-                            + std::to_string(std::numeric_limits<std::int32_t>::min()) + " / -1");
+                            + std::to_string(std::numeric_limits<std::int64_t>::min()) + " / -1");
             }
             return l / r;
         default:
@@ -113,7 +140,10 @@ std::string interpreter::execute(const std::vector<char> &program) {
             operands.push(object(mem->get_local_var(*buffer.read<std::uint8_t>())));
             break;
         case op_code::int_lit:
-            operands.push(object(*buffer.read<std::int32_t>()));
+            operands.push(object(*buffer.read<std::int64_t>()));
+            break;
+        case op_code::uint_lit:
+            operands.push(object(*buffer.read<std::uint64_t>()));
             break;
         case op_code::float_lit:
             operands.push(object(*buffer.read<double>()));
@@ -174,7 +204,7 @@ void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) 
     if(code == op_code::semicolon)
         result = right;
     else if(is_binary_comp(code))
-        result = static_cast<std::int32_t>(binary_comp(code, left, right));
+        result = static_cast<std::int64_t>(binary_comp(code, left, right));
     else if(is_binary_int_op(code))
         result = binary_int_op(code, left, right);
     else if(is_binary_arithmetic(code))
@@ -183,7 +213,7 @@ void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) 
         throw std::logic_error("Currently unspported binary op: " + std::to_string(static_cast<int>(code)));
 
     if(is_assign) {
-        *std::get<lvalue_ref>(left.get()) = result;
+        *std::get<lvalue_ref>(left.get()) = to_variant<object::type>(result.value());
     } else {
         operands.push(result);
     }
@@ -202,9 +232,10 @@ void interpreter::execute_unary_op(std::stack<object> &operands, op_code code) {
 
     object result = std::visit([code](auto &&v) -> object::type {
         switch(code) {
+        case op_code::plus:      return static_cast<std::int64_t>(v);
         case op_code::negate:    return -v;
-        case op_code::bit_not:   return ~static_cast<std::int32_t>(v);
-        case op_code::logic_not: return static_cast<std::int32_t>(!v);
+        case op_code::bit_not:   return ~to_int(v);
+        case op_code::logic_not: return static_cast<std::int64_t>(!v);
         default:
             throw std::logic_error("Currently unsupported unary op: " + std::to_string(static_cast<int>(code)));
         }
