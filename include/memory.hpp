@@ -27,7 +27,7 @@ public:
         return array;
     }
 
-    lvalue_ref make_lvalue(object::type value = std::monostate()) {
+    var_ref make_lvalue(object::type value = std::monostate()) {
         auto lvalue = std::make_shared<object>(std::move(value));
         lvalues.push_front(lvalue);
         return lvalue;
@@ -53,7 +53,7 @@ public:
         frames.pop();
     }
 
-    lvalue_ref get_local_var(std::size_t index) {
+    var_ref get_local_var(std::size_t index) {
         if constexpr(debug) {
             if(frames.empty())
                 throw std::logic_error("get_local_var: no stack frames!");
@@ -72,8 +72,8 @@ private:
     std::list<std::weak_ptr<std::vector<object>>> arrays;
     std::list<std::weak_ptr<object>> lvalues;
 
-    std::unordered_map<std::string, lvalue_ref> globals;
-    std::vector<lvalue_ref> local_var_stack;
+    std::unordered_map<std::string, var_ref> globals;
+    std::vector<var_ref> local_var_stack;
     std::stack<frame> frames;
 };
 

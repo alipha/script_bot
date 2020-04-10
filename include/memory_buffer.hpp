@@ -41,7 +41,7 @@ public:
     }
 
     std::string_view read_str() {
-        auto len = read<std::uint16_t>();
+        auto len = *read<std::uint16_t>();
         bounds_check(len);
 
         std::string_view result(&buf[pos], len);
