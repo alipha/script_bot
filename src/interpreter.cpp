@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -35,7 +36,7 @@ value_type do_with_doubles(const value_type &left, const value_type &right, Func
 }
 */
 
-
+/*
 template<typename Int>
 auto to_optional_int(Int &&x) {
     using T = std::decay_t<Int>;
@@ -44,26 +45,8 @@ auto to_optional_int(Int &&x) {
     else
         return std::optional<T>(x);
 }
+*/
 
-template<typename Int>
-auto to_int(Int &&x) {
-    using T = std::decay_t<Int>;
-    if constexpr(std::is_same_v<T, std::uint64_t>)
-        return x;
-    else
-        return static_cast<std::int64_t>(x);
-}
-
-template<typename T>
-std::optional<std::string> to_optional_string(T &&v) {
-    using TVal = std::decay_t<T>;
-    if constexpr(std::is_same_v<TVal, std::monostate>)
-        return {};
-    else if constexpr(std::is_same_v<TVal, string_ref>)
-        return {*v};
-    else
-        return {std::to_string(v)};
-}
 
 
 template<typename T, typename U>
@@ -87,7 +70,7 @@ bool binary_comp(op_code code, const object &left, const object &right) {
     case op_code::logic_and: return left.to_bool() && right.to_bool();
     case op_code::logic_or:  return left.to_bool() || right.to_bool();
     default:
-        return std::visit([code](auto &&left, auto &&right) {
+        return std::visit([code](auto &&left, auto &&right) -> bool {
             using L = std::decay_t<decltype(left)>;
             using R = std::decay_t<decltype(right)>;
 
@@ -99,8 +82,11 @@ bool binary_comp(op_code code, const object &left, const object &right) {
                 return do_binary_comp(code, std::optional<R>(), std::optional<R>(right));
             } else if constexpr(std::is_same_v<R, std::monostate>) {
                 return do_binary_comp(code, std::optional<L>(left), std::optional<L>());
-            } else {
+            // TODO: deep comparison of array_ref? (and map_ref?)
+            } else if constexpr((std::is_arithmetic_v<L> && std::is_arithmetic_v<R>) || std::is_same_v<L, R>) {
                 return do_binary_comp(code, std::optional<L>(left), std::optional<R>(right));
+            } else {
+                throw std::runtime_error("Performing "s + lookup_operation(code).symbol + " between different types");
             }
         }, left.value(), right.value());
     }
@@ -125,6 +111,7 @@ object binary_int_op(op_code code, const object &left, const object &right) {
 
 
 object binary_arithmetic(op_code code, const object &left, const object &right) {
+    // TODO: operator+ for arrays?
     if (std::holds_alternative<string_ref>(left.value()) 
             || std::holds_alternative<string_ref>(right.value())) {
         if(code == op_code::add) {
@@ -137,8 +124,8 @@ object binary_arithmetic(op_code code, const object &left, const object &right) 
             using LeftT = std::decay_t<decltype(l)>;
             using RightT = std::decay_t<decltype(r)>;
 
-            if constexpr(std::is_same_v<LeftT, string_ref> || std::is_same_v<RightT, string_ref>) {
-                throw std::logic_error("Got into binary_arithmetic() with a string_ref");
+            if constexpr(!std::is_arithmetic_v<LeftT> || !std::is_arithmetic_v<RightT>) {
+                throw std::runtime_error("Performing "s + lookup_operation(code).symbol + " on non-arithmetic type type");
             } else {
                 switch(code) {
                 case op_code::pow: return std::pow(l, r);
@@ -214,21 +201,7 @@ std::string interpreter::execute(const std::vector<char> &program) {
         }
     }
 
-    std::string result = std::visit([](auto &&value) -> std::string {
-        using T = std::decay_t<decltype(value)>;
-        if constexpr(std::is_same_v<T, std::monostate>) {
-            return "null";
-        } else if constexpr(std::is_same_v<T, string_ref>) {
-            return *value;
-        } else {
-            std::stringstream ss;
-            if constexpr(std::is_same_v<T, double>)
-                ss << std::fixed << std::setprecision(15);
-            ss << value;
-            return ss.str(); 
-        }
-    }, operands.top().value());
-
+    std::string result = operands.top().to_string();
     mem->pop_frame();
     return result;
 }
@@ -238,7 +211,7 @@ void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) 
     if constexpr(debug) {
         if(operands.size() < 2) {
             throw std::logic_error("execute_binary_op with " + std::to_string(operands.size()) 
-                    + " operands. op_code: " + std::to_string(static_cast<int>(code)));
+                    + " operands. op_code: " + lookup_operation(code).symbol);
         }
     }
 
@@ -260,7 +233,7 @@ void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) 
     else if(is_binary_arithmetic(code))
         result = binary_arithmetic(code, left, right);
     else
-        throw std::logic_error("Currently unspported binary op: " + std::to_string(static_cast<int>(code)));
+        throw std::logic_error("Currently unspported binary op: "s + lookup_operation(code).symbol);
 
     if(is_assign) {
         *std::get<var_ref>(left.get()) = to_variant<object::type>(result.value());
@@ -273,8 +246,8 @@ void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) 
 void interpreter::execute_unary_op(std::stack<object> &operands, op_code code) {
     if constexpr(debug) {
         if(operands.empty()) {
-            throw std::logic_error("execute_unary_op with zero operands. op_code: "
-                    + std::to_string(static_cast<int>(code)));
+            throw std::logic_error("execute_unary_op with zero operands. op_code: "s
+                    + lookup_operation(code).symbol);
         }
     }
 
@@ -296,6 +269,8 @@ void interpreter::execute_unary_op(std::stack<object> &operands, op_code code) {
             } else {
                 throw std::runtime_error("String does not support: "s + lookup_operation(code).symbol);
             }
+        } else if constexpr(!std::is_arithmetic_v<T>) {
+                throw std::runtime_error("Performing "s + lookup_operation(code).symbol + " on non-arithmetic type type");
         } else {
             switch(code) {
             case op_code::plus:      return static_cast<std::int64_t>(v);
