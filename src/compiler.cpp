@@ -156,6 +156,7 @@ template<typename ResultType, typename Accumulator>
 std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, ResultType &result, Accumulator accum) {
     std::stack<op_code> token_pairs;
     std::stack<op_code> op_codes;
+    op_code last_code = op_code::none;
     bool in_binary_context = false;
 
     local_var_indexes.clear();
@@ -165,7 +166,18 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
         tokens.push_back(";");
 
     for(auto token : tokens) {
+        if((last_code == op_code::array_start && token == "]")
+                || (last_code == op_code::map_start && token == "}")) {
+//                || (last_code == op_code::func_call && token == ")")) {
+            op_codes.pop();
+            token_pairs.pop();
+            in_binary_context = !in_binary_context;
+            last_code = op_code::none;
+            continue;
+        }
+
         operation_type op_type = lookup_operation(token, in_binary_context);
+        last_code = op_type.code;
 
         if(op_type.code == op_code::none && !token.empty()) {
             if(in_binary_context)

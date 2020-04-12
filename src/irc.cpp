@@ -95,6 +95,8 @@ void irc_client::login() {
 
 
 void irc_client::write(std::string_view message) {
+    if(message.size() > 425)
+        message = message.substr(0, 425);
     std::cout << '>' << message << std::endl;
     boost::asio::write(sock, boost::asio::buffer(message.data(), message.size()));
     boost::asio::write(sock, boost::asio::buffer("\r\n", 2));

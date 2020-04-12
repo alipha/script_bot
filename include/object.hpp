@@ -54,13 +54,29 @@ inline std::uint64_t to_int(std::uint64_t arg) { return arg; }
 
 
 
-inline std::optional<std::string> to_optional_string(std::monostate) { return {}; }
-inline std::optional<std::string> to_optional_string(string_ref s) { return {*s}; }
-inline std::optional<std::string> to_optional_string(func_ref) { return {"<function>"}; }
-inline std::optional<std::string> to_optional_string(std::uint64_t v) { return {std::to_string(v)}; }
-inline std::optional<std::string> to_optional_string(std::int64_t v) { return {std::to_string(v)}; }
+inline std::optional<std::string> to_optional_string(std::monostate, std::size_t = 0, bool = false) { return {}; }
+inline std::optional<std::string> to_optional_string(func_ref, std::size_t = 0, bool = false) { return {"<function>"}; }
+inline std::optional<std::string> to_optional_string(std::uint64_t v, std::size_t = 0, bool = false) { return {std::to_string(v)}; }
+inline std::optional<std::string> to_optional_string(std::int64_t v, std::size_t = 0, bool = false) { return {std::to_string(v)}; }
 
-inline std::optional<std::string> to_optional_string(double v) {
+inline std::optional<std::string> to_optional_string(string_ref s, std::size_t = 0, bool format = false) {
+    if(!format) 
+        return {*s};
+
+    std::string result("\"");
+    for(char ch : *s) {
+        if(ch == '\"')
+            result += "\\\"";
+        else if(ch == '\\')
+            result += "\\\\";
+        else
+            result += ch;
+    }
+    result += "\"";
+    return result; 
+}
+
+inline std::optional<std::string> to_optional_string(double v, std::size_t = 0, bool = false) {
     thread_local std::stringstream ss;
     ss.str("");
     ss.precision(15);
@@ -68,8 +84,8 @@ inline std::optional<std::string> to_optional_string(double v) {
     return ss.str();
 }
 
-inline std::optional<std::string> to_optional_string(array_ref ref);
-inline std::optional<std::string> to_optional_string(map_ref ref);
+inline std::optional<std::string> to_optional_string(array_ref ref, std::size_t depth = 0, bool format = false);
+inline std::optional<std::string> to_optional_string(map_ref ref, std::size_t depth = 0, bool format = false);
 
 template<typename T>
 inline std::string to_str(const T &v) { return to_optional_string(v).value_or("null"); }
@@ -98,12 +114,12 @@ public:
     type &get() { return val; }
 
     
-    std::optional<std::string> to_optional_string() const {
-        return std::visit([](auto &&v) { return ::to_optional_string(v); }, value());
+    std::optional<std::string> to_optional_string(std::size_t depth = 0, bool format = false) const {
+        return std::visit([depth, format](auto &&v) { return ::to_optional_string(v, depth, format); }, value());
     }
     
-    std::string to_string() const {
-        return to_optional_string().value_or("null");
+    std::string to_string(std::size_t depth = 0, bool format = false) const {
+        return to_optional_string(depth, format).value_or("null");
     }
 
     bool to_bool() const {
@@ -162,28 +178,32 @@ private:
 };
 
 
-inline std::optional<std::string> to_optional_string(array_ref ref) {
+inline std::optional<std::string> to_optional_string(array_ref ref, std::size_t depth, bool) {
     if(ref->empty())
         return {"[]"};
+    if(depth >= 20)
+        return "...";
 
     std::string out("[");
 
     for(object &obj : *ref)
-        out += obj.to_string() + ", "; // TODO: to_formatted_string()
+        out += obj.to_string(depth+1, true) + ", ";
 
     out.pop_back();
     out.back() = ']';
     return {out};
 }
 
-inline std::optional<std::string> to_optional_string(map_ref ref) {
+inline std::optional<std::string> to_optional_string(map_ref ref, std::size_t depth, bool) {
     if(ref->empty())
         return {"{}"};
+    if(depth >= 20)
+        return "...";
 
     std::string out("{");
 
     for(const auto &keypair : *ref)
-        out += keypair.first + ": " + keypair.second.to_string() + ", "; // TODO: to_formatted_string()
+        out += keypair.first + ": " + keypair.second.to_string(depth+1, true) + ", ";
 
     out.pop_back();
     out.back() = '}';
