@@ -16,7 +16,7 @@ operation_type operation_types[] = {
     {"",    true,  0, associative::left,    0, op_category::other,      op_code::none},
     {".",   true,  2, associative::left,  900, op_category::other,      op_code::dot},
     {"(",   true,  2, associative::left,  100, op_category::other,      op_code::func_call},
-    {"[",   true,  2, associative::left,  100, op_category::other,      op_code::array_index},
+    {"[",   true,  2, associative::left,  100, op_category::other,      op_code::index},
     {"<",   true,  2, associative::left,  450, op_category::comparison, op_code::lt},
     {"<=",  true,  2, associative::left,  450, op_category::comparison, op_code::lte},
     {">",   true,  2, associative::left,  450, op_category::comparison, op_code::gt},
@@ -25,6 +25,9 @@ operation_type operation_types[] = {
     {"!=",  true,  2, associative::left,  450, op_category::comparison, op_code::neq},
     {"&&",  true,  2, associative::left,  300, op_category::comparison, op_code::logic_and},
     {"||",  true,  2, associative::left,  275, op_category::comparison, op_code::logic_or},
+    {",",   true,  2, associative::left,  150, op_category::other,      op_code::array_add},
+    {",",   true,  2, associative::left,  150, op_category::other,      op_code::map_add},
+    {",",   true,  2, associative::left,  150, op_category::other,      op_code::comma},
     {";",   true,  2, associative::left,   10, op_category::other,      op_code::semicolon},
     {"%",   true,  2, associative::left,  550, op_category::integer,    op_code::mod},
     {"&",   true,  2, associative::left,  375, op_category::integer,    op_code::bit_and},
@@ -57,11 +60,11 @@ operation_type operation_types[] = {
     {"!",   false, 1, associative::right, 600, op_category::comparison, op_code::logic_not},
     {"+",   false, 1, associative::right, 600, op_category::integer,    op_code::plus},
     {"-",   false, 1, associative::right, 600, op_category::arithmetic, op_code::negate},
-    {"(",   false, 1, associative::left,  101, op_category::other,      op_code::left_paren},
+    {"(",   false, 1, associative::left,  100, op_category::other,      op_code::left_paren},
     {")",   true,  1, associative::left,  100, op_category::other,      op_code::right_paren},
-    {"[",   false, 1, associative::left,  101, op_category::other,      op_code::array_start},
+    {"[",   false, 1, associative::left,  100, op_category::other,      op_code::array_start},
     {"]",   true,  1, associative::left,  100, op_category::other,      op_code::array_end},
-    {"{",   false, 1, associative::left,  101, op_category::other,      op_code::map_start},
+    {"{",   false, 1, associative::left,  100, op_category::other,      op_code::map_start},
     {"}",   true,  1, associative::left,  100, op_category::other,      op_code::map_end}
 };
 

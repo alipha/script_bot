@@ -134,8 +134,27 @@ std::uint8_t compiler::local_var_index(std::string_view name) {
 
 
 template<typename ResultType, typename Accumulator>
+void find_pair(std::stack<op_code> &token_pairs, std::stack<op_code> &op_codes, operation_type current, op_code target, op_code target2, ResultType &result, Accumulator accum) {
+    op_code top_code;
+
+    if(token_pairs.empty() || ((top_code = pop(token_pairs)) != target && top_code != target2))
+        throw std::runtime_error("Mismatched "s + lookup_operation(target).symbol);
+
+    while((top_code = pop(op_codes)) != target && top_code != target2) {
+        accum(result, lookup_operation(top_code).symbol, top_code, true);
+    }
+
+    operation_type top_type = lookup_operation(top_code);
+    if(top_type.operand_count == 2)
+        accum(result, top_type.symbol, top_code, true);
+    else
+        accum(result, current.symbol, current.code, true);
+}
+
+
+template<typename ResultType, typename Accumulator>
 std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, ResultType &result, Accumulator accum) {
-    std::stack<std::string_view> token_pairs;
+    std::stack<op_code> token_pairs;
     std::stack<op_code> op_codes;
     bool in_binary_context = false;
 
@@ -177,34 +196,60 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
         switch(op_type.code) {
         case op_code::func_call:
         case op_code::left_paren:
-        case op_code::array_index:
+        case op_code::index:
         case op_code::array_start:
         case op_code::map_start:
-            token_pairs.push(token);
+            //if(op_type.code == op_code::array_start || op_type.code == op_code::map_start)
+            if(op_type.operand_count == 1)
+                accum(result, op_type.symbol, op_type.code, true);
+            token_pairs.push(op_type.code);
             op_codes.push(op_type.code);
             continue;
         case op_code::right_paren:
-            if(token_pairs.empty() || pop(token_pairs) != "(")
-                throw std::runtime_error("Mismatched )");
-            break;
+            find_pair(token_pairs, op_codes, op_type, op_code::func_call, op_code::left_paren, result, accum);
+            continue;
         case op_code::array_end:
-            if(token_pairs.empty() || pop(token_pairs) != "[")
-                throw std::runtime_error("Mismatched ]");
-            break;
+            find_pair(token_pairs, op_codes, op_type, op_code::index, op_code::array_start, result, accum);
+            continue;
         case op_code::map_end:
-            if(token_pairs.empty() || pop(token_pairs) != "{")
-                throw std::runtime_error("Mismatched }");
+            find_pair(token_pairs, op_codes, op_type, op_code::map_start, op_code::none, result, accum);
+            continue;
+        default: 
             break;
-        default: break;
         }
         
         op_code top_code;
+
         while(!op_codes.empty() && has_lower_precedence(op_type.code, top_code = op_codes.top())) {
-            accum(result, lookup_operation(top_code).symbol, top_code, true);
+            switch(top_code) {
+            case op_code::func_call:    // TODO: remove?
+            case op_code::left_paren:
+            case op_code::index:
+            case op_code::array_start:
+            case op_code::map_start:
+                throw std::logic_error("Unexpected symbol: "s + lookup_operation(top_code).symbol);
+            default:
+                accum(result, lookup_operation(top_code).symbol, top_code, true);
+            }
             op_codes.pop();
         }
 
-        op_codes.push(op_type.code);
+        if(op_type.code == op_code::comma) {
+            if(token_pairs.empty())
+                throw std::runtime_error("Comma not within (), [] or {}");
+
+            op_code code = op_code::comma;
+
+            if(token_pairs.top() == op_code::array_start)
+                code = op_code::array_add;
+            else if(token_pairs.top() == op_code::map_start)
+                code = op_code::map_add;
+
+            accum(result, ",", code, true);
+            //op_codes.push(op_code::array_add);
+        } else {    
+            op_codes.push(op_type.code);
+        }
     }
 
     if constexpr(debug) {
@@ -216,7 +261,7 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
     }
 
     if(!token_pairs.empty()) {
-        throw std::runtime_error("Mismatched "s + pop(token_pairs));
+        throw std::runtime_error("Mismatched "s + lookup_operation(pop(token_pairs)).symbol);
     }
 
     std::size_t local_var_count = local_var_indexes.size();

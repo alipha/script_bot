@@ -186,6 +186,13 @@ std::string interpreter::execute(const std::vector<char> &program) {
         case op_code::str_lit:
             operands.push(object(std::make_shared<std::string>(buffer.read_str())));
             break;
+        case op_code::array_start:
+            operands.push(object(mem->make_array()));
+            break;
+        case op_code::array_add:
+        case op_code::array_end:
+            array_add(operands);
+            break;
         default:
             if(is_binary_op(code)) {
                 execute_binary_op(operands, code);
@@ -204,6 +211,42 @@ std::string interpreter::execute(const std::vector<char> &program) {
     std::string result = operands.top().to_string();
     mem->pop_frame();
     return result;
+}
+
+
+void interpreter::array_add(std::stack<object> &operands) {
+    if constexpr(debug) {
+        if(operands.size() < 2)
+            throw std::logic_error("execute array_add with " + std::to_string(operands.size()) + "operands");
+    }
+
+    object element = pop(operands);
+    std::get<array_ref>(operands.top().value())->push_back(element);
+}
+
+
+object index_op(object &left, const object &right) {
+    return object::type(std::visit([](auto &&l, auto &&r) -> lvalue_ref {
+        using L = std::decay_t<decltype(l)>;
+        using R = std::decay_t<decltype(r)>;
+
+        if constexpr(std::is_same_v<L, array_ref>) {
+            std::int64_t index = to_int(r);
+            if(index < 0 || index >= l->size())
+                throw std::runtime_error("array index out of bounds: " + std::to_string(index) 
+                        + ", size: " + std::to_string(l->size()));
+            return &(*l)[index];
+        } else if constexpr(std::is_same_v<L, map_ref>) {
+            if constexpr(std::is_integral_v<R> || std::is_same_v<R, string_ref>) {
+                return &(*l)[to_str(r)];
+            } else {
+                throw std::runtime_error("map index with non-string/non-int type");
+            }
+        //} else if constexpr(std::is_same_v<L, string_ref>) {  // TODO: string indexing
+        } else {
+            throw std::runtime_error("object does not support []");
+        }
+    }, left.non_null_value(), right.non_null_value()));
 }
 
 
@@ -226,6 +269,8 @@ void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) 
 
     if(code == op_code::semicolon)
         result = right;
+    else if(code == op_code::index)
+        result = index_op(left, right);
     else if(is_binary_comp(code))
         result = static_cast<std::int64_t>(binary_comp(code, left, right));
     else if(is_binary_int_op(code))
@@ -233,10 +278,15 @@ void interpreter::execute_binary_op(std::stack<object> &operands, op_code code) 
     else if(is_binary_arithmetic(code))
         result = binary_arithmetic(code, left, right);
     else
-        throw std::logic_error("Currently unspported binary op: "s + lookup_operation(code).symbol);
+        throw std::logic_error("currently unspported binary op: "s + lookup_operation(code).symbol);
 
     if(is_assign) {
-        *std::get<var_ref>(left.get()) = to_variant<object::type>(result.value());
+        if(var_ref *var = std::get_if<var_ref>(&left.get()))
+            **var = to_variant<object::type>(result.value());
+        else if(lvalue_ref *lvalue = std::get_if<lvalue_ref>(&left.get()))
+            **lvalue = to_variant<object::type>(result.value()); 
+        else
+            throw std::runtime_error("left of "s + lookup_operation(code).symbol + " is not assignable");
     } else {
         operands.push(result);
     }

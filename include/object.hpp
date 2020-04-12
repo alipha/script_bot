@@ -81,7 +81,7 @@ public:
     using non_null_type = std::variant<std::int64_t, std::uint64_t, double, 
           string_ref, array_ref, map_ref, func_ref>;
     using value_type = variant_push_t<std::monostate, non_null_type>;
-    using type = variant_push_t<value_type, var_ref>;
+    using type = variant_push_t<variant_push_t<value_type, var_ref>, lvalue_ref>;
     using int_type = std::variant<std::int64_t, std::uint64_t>; 
     //using nullable_int_type = variant_push_t<std::monostate, int_type>;
 
@@ -151,7 +151,7 @@ public:
     value_type value() const {
         return std::visit([](auto &&v) -> value_type {
             using T = std::decay_t<decltype(v)>;
-            if constexpr(std::is_same_v<T, var_ref> /*|| std::is_same_v<T, lvalue_ref>*/)
+            if constexpr(std::is_same_v<T, var_ref> || std::is_same_v<T, lvalue_ref>)
                 return v->value();
             else
                 return v;
