@@ -165,6 +165,7 @@ std::string interpreter::execute(const std::vector<char> &program) {
         switch(code) {
         case op_code::left_paren:
         case op_code::right_paren:
+        case op_code::colon:
             break;
         case op_code::global_var:
             throw std::logic_error("global_var is currently unsupported");
@@ -189,9 +190,16 @@ std::string interpreter::execute(const std::vector<char> &program) {
         case op_code::array_start:
             operands.push(object(mem->make_array()));
             break;
+        case op_code::map_start:
+            operands.push(object(mem->make_map()));
+            break;
         case op_code::array_add:
         case op_code::array_end:
             array_add(operands);
+            break;
+        case op_code::map_add:
+        case op_code::map_end:
+            map_add(operands);
             break;
         default:
             if(is_binary_op(code)) {
@@ -207,7 +215,7 @@ std::string interpreter::execute(const std::vector<char> &program) {
             throw std::logic_error("Expected one operand in stack. size: " + std::to_string(operands.size()));
         }
     }
-
+    
     std::string result = operands.top().to_string();
     mem->pop_frame();
     return result;
@@ -225,20 +233,37 @@ void interpreter::array_add(std::stack<object> &operands) {
 }
 
 
-object index_op(object &left, const object &right) {
+void interpreter::map_add(std::stack<object> &operands) {
+    if constexpr(debug) {
+        if(operands.size() < 3)
+            throw std::logic_error("execute map_add with " + std::to_string(operands.size()) + "operands");
+    }
+
+    object value = pop(operands);
+    object key = pop(operands);
+    std::get<map_ref>(operands.top().value())->try_emplace(key.to_string(), value);
+}
+
+
+object interpreter::index_op(const object &left, const object &right) {
+    bool temp = !std::holds_alternative<lvalue_ref>(left.get()) 
+        && !std::holds_alternative<var_ref>(left.get()); 
+    if(temp)
+        mem->push_temp(left);
+
     return object::type(std::visit([](auto &&l, auto &&r) -> lvalue_ref {
         using L = std::decay_t<decltype(l)>;
         using R = std::decay_t<decltype(r)>;
 
         if constexpr(std::is_same_v<L, array_ref>) {
             std::int64_t index = to_int(r);
-            if(index < 0 || index >= l->size())
+            if(index < 0 || static_cast<std::size_t>(index) >= l->size())
                 throw std::runtime_error("array index out of bounds: " + std::to_string(index) 
                         + ", size: " + std::to_string(l->size()));
             return &(*l)[index];
         } else if constexpr(std::is_same_v<L, map_ref>) {
             if constexpr(std::is_integral_v<R> || std::is_same_v<R, string_ref>) {
-                return &(*l)[to_str(r)];
+                return &l->try_emplace(to_str(r), std::monostate()).first->second;
             } else {
                 throw std::runtime_error("map index with non-string/non-int type");
             }
@@ -313,9 +338,9 @@ void interpreter::execute_unary_op(std::stack<object> &operands, op_code code) {
         if constexpr(std::is_same_v<T, string_ref>) {
             if(code == op_code::plus) {
                 if(!v->empty() && v->front() == '-')
-                    return std::stoll(*v);
+                    return static_cast<std::int64_t>(std::stoll(*v));
                 else
-                    return std::stoull(*v);
+                    return static_cast<std::uint64_t>(std::stoull(*v));
             } else {
                 throw std::runtime_error("String does not support: "s + lookup_operation(code).symbol);
             }

@@ -28,6 +28,7 @@ operation_type operation_types[] = {
     {",",   true,  2, associative::left,  150, op_category::other,      op_code::array_add},
     {",",   true,  2, associative::left,  150, op_category::other,      op_code::map_add},
     {",",   true,  2, associative::left,  150, op_category::other,      op_code::comma},
+    {":",   true,  2, associative::left,  170, op_category::other,      op_code::colon},
     {";",   true,  2, associative::left,   10, op_category::other,      op_code::semicolon},
     {"%",   true,  2, associative::left,  550, op_category::integer,    op_code::mod},
     {"&",   true,  2, associative::left,  375, op_category::integer,    op_code::bit_and},

@@ -4,7 +4,6 @@
 #include "object.hpp"
 #include "util.hpp"
 
-#include <list>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -14,8 +13,9 @@
 
 
 struct frame {
-    explicit frame(std::size_t s) : size(s) {}
+    frame(std::size_t s, std::size_t t) : size(s), temps_start(t) {}
     std::size_t size;
+    std::size_t temps_start;
 };
 
 
@@ -23,20 +23,30 @@ class memory {
 public:
     array_ref make_array() {
         auto array = std::make_shared<std::vector<object>>();
-        arrays.push_front(array);
+        arrays.push_back(array);
         return array;
+    }
+
+    map_ref make_map() {
+        auto map = std::make_shared<std::unordered_map<std::string, object>>();
+        maps.push_back(map);
+        return map;
+    }
+
+    void push_temp(object temp) {
+        temps_stack.push_back(std::move(temp));
     }
 
     var_ref make_lvalue(object::type value = std::monostate()) {
         auto lvalue = std::make_shared<object>(std::move(value));
-        lvalues.push_front(lvalue);
+        lvalues.push_back(lvalue);
         return lvalue;
     }
 
     void push_frame(std::size_t size) {
         for(std::size_t i = 0; i < size; i++)
             local_var_stack.push_back(make_lvalue());
-        frames.push(frame(size));
+        frames.push(frame(size, temps_stack.size()));
     }
 
     void pop_frame() {
@@ -50,6 +60,7 @@ public:
         }
 
         local_var_stack.resize(local_var_stack.size() - frames.top().size);
+        temps_stack.resize(frames.top().temps_start);
         frames.pop();
     }
 
@@ -69,10 +80,12 @@ public:
     }
 
 private:
-    std::list<std::weak_ptr<std::vector<object>>> arrays;
-    std::list<std::weak_ptr<object>> lvalues;
+    std::vector<std::weak_ptr<std::vector<object>>> arrays;
+    std::vector<std::weak_ptr<std::unordered_map<std::string, object>>> maps;
+    std::vector<std::weak_ptr<object>> lvalues;
 
     std::unordered_map<std::string, var_ref> globals;
+    std::vector<object> temps_stack;
     std::vector<var_ref> local_var_stack;
     std::stack<frame> frames;
 };

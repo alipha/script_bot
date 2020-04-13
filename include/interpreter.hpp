@@ -22,8 +22,10 @@ public:
 
 private:
     void array_add(std::stack<object> &operands);
+    void map_add(std::stack<object> &operands);
     void execute_binary_op(std::stack<object> &operands, op_code code);
     void execute_unary_op(std::stack<object> &operands, op_code code);
+    object index_op(const object &left, const object &right);
 
     memory *mem;
 };

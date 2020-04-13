@@ -83,10 +83,10 @@ std::vector<char> compiler::compile(std::vector<std::string_view> token_list) {
                 buf.append(this->local_var_index(token));
                 break;
             case op_code::int_lit:
-                buf.append(std::stoll(std::string(token)));  // TODO: from_chars?
+                buf.append(static_cast<int64_t>(std::stoll(std::string(token))));  // TODO: from_chars?
                 break;
             case op_code::uint_lit:
-                buf.append(std::stoull(std::string(token)));  // TODO: from_chars?
+                buf.append(static_cast<uint64_t>(std::stoull(std::string(token))));  // TODO: from_chars?
                 break;
             case op_code::float_lit:
                 buf.append(std::stod(std::string(token)));
@@ -158,6 +158,7 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
     std::stack<op_code> op_codes;
     op_code last_code = op_code::none;
     bool in_binary_context = false;
+    bool expect_colon = false;
 
     local_var_indexes.clear();
 
@@ -166,6 +167,13 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
         tokens.push_back(";");
 
     for(auto token : tokens) {
+        if(expect_colon) {
+            if(token != ":")
+                throw std::runtime_error("Expected `:` not "s + token);
+            expect_colon = false;
+            continue;
+        }
+
         if((last_code == op_code::array_start && token == "]")
                 || (last_code == op_code::map_start && token == "}")) {
 //                || (last_code == op_code::func_call && token == ")")) {
@@ -177,6 +185,24 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
         }
 
         operation_type op_type = lookup_operation(token, in_binary_context);
+
+        if(last_code == op_code::map_start || (last_code == op_code::comma && token_pairs.top() == op_code::map_start)) {
+            if(op_type.code != op_code::none || token.empty() || token == "null")
+                throw std::runtime_error("`"s + token + "` is not a valid map key.");
+
+            if(token[0] == '"' || token[0] == '\'') {
+                accum(result, token, op_code::str_lit, false);
+            } else {
+                std::string t = "\""s + token + "\"";
+                accum(result, {t.data(), t.size()}, op_code::str_lit, false);
+            }
+
+            expect_colon = true;
+            last_code = op_type.code;
+            continue;
+        }
+
+        expect_colon = false;
         last_code = op_type.code;
 
         if(op_type.code == op_code::none && !token.empty()) {
@@ -206,6 +232,8 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
             in_binary_context = !in_binary_context;
 
         switch(op_type.code) {
+        case op_code::colon:
+            throw std::runtime_error("`:` was not expected here");
         case op_code::func_call:
         case op_code::left_paren:
         case op_code::index:
