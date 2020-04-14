@@ -152,6 +152,20 @@ object binary_arithmetic(op_code code, const object &left, const object &right) 
 }
 
 
+void execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code) {
+    if constexpr(debug) {
+        if(operands.empty()) {
+            throw std::logic_error("execute_if_statement with zero operands. op_code: "s
+                    + lookup_operation(code).symbol);
+        }
+    }
+
+    std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
+
+    if(!pop(operands).to_bool())
+        buffer.seek_abs(jump_pos);
+}
+
 
 std::string interpreter::execute(const std::vector<char> &program) {
     memory_buffer<debug> buffer(program);
@@ -166,6 +180,10 @@ std::string interpreter::execute(const std::vector<char> &program) {
         case op_code::left_paren:
         case op_code::right_paren:
         case op_code::colon:
+        case op_code::block_end:
+            break;
+        case op_code::if_block:
+            pop(operands);
             break;
         case op_code::global_var:
             throw std::logic_error("global_var is currently unsupported");
@@ -200,6 +218,9 @@ std::string interpreter::execute(const std::vector<char> &program) {
         case op_code::map_add:
         case op_code::map_end:
             map_add(operands);
+            break;
+        case op_code::if_start:
+            execute_control_statement(buffer, operands, code);
             break;
         default:
             if(is_binary_op(code)) {

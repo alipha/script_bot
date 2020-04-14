@@ -65,8 +65,12 @@ operation_type operation_types[] = {
     {")",   true,  1, associative::left,  100, op_category::other,      op_code::right_paren},
     {"[",   false, 1, associative::left,  100, op_category::other,      op_code::array_start},
     {"]",   true,  1, associative::left,  100, op_category::other,      op_code::array_end},
+    {"{",   false, 1, associative::left,  100, op_category::other,      op_code::block_start},
     {"{",   false, 1, associative::left,  100, op_category::other,      op_code::map_start},
-    {"}",   true,  1, associative::left,  100, op_category::other,      op_code::map_end}
+    {"}",   true,  1, associative::left,  100, op_category::other,      op_code::block_end},
+    {"}",   true,  1, associative::left,  100, op_category::other,      op_code::map_end},
+    {"if",  false, 1, associative::left,    5, op_category::other,      op_code::if_start},
+    {"/if", true,  1, associative::left,    5, op_category::other,      op_code::if_block}
 };
 
 

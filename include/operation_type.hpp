@@ -66,17 +66,21 @@ enum class op_code : std::uint8_t {
     left_paren,  // 30
     right_paren,
     array_start,
-    array_end,   // 33
+    array_end,
+    block_start, // 34
     map_start,
+    block_end,
     map_end,
-    count,       // 36
+    if_start,    // 38
+    if_block,
+    count,
 
     global_var,
-    local_var,
+    local_var,   // 3c
     int_lit,
-    uint_lit,    // 3a
+    uint_lit,
     float_lit,
-    str_lit,
+    str_lit,     // 40
     null_lit
 };
 
@@ -119,7 +123,7 @@ inline bool is_binary_op(op_code code) {
 }
 
 inline bool is_unary_op(op_code code) {
-    return code >= op_code::pre_inc && code <= op_code::map_end;
+    return code >= op_code::pre_inc && code <= op_code::if_block;
 }
 
 inline bool is_binary_comp(op_code code) {
