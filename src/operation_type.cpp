@@ -69,8 +69,11 @@ operation_type operation_types[] = {
     {"{",   false, 1, associative::left,  100, op_category::other,      op_code::map_start},
     {"}",   true,  1, associative::left,  100, op_category::other,      op_code::block_end},
     {"}",   true,  1, associative::left,  100, op_category::other,      op_code::map_end},
-    {"if",  false, 1, associative::left,    5, op_category::other,      op_code::if_start},
-    {"/if", true,  1, associative::left,    5, op_category::other,      op_code::if_block}
+    {"if",  true,  1, associative::left,    5, op_category::other,      op_code::if_start},    // TODO: changed binary context
+    {"/if", true,  1, associative::left,    5, op_category::other,      op_code::if_block},
+    {"while/",true,1, associative::left,    5, op_category::other,      op_code::while_start}, // TODO: changed binary context
+    {"/while",true,1, associative::left,    5, op_category::other,      op_code::while_block},
+    {"while", true,1, associative::left,    5, op_category::other,      op_code::while_cond}
 };
 
 

@@ -65,18 +65,41 @@ std::string compiler::to_postfix(std::vector<std::string_view> token_list) {
 
 std::vector<char> compiler::compile(std::vector<std::string_view> token_list) {
     std::stack<std::size_t> jump_indexes;
-
+    std::stack<std::size_t> while_indexes;
     memory_buffer<debug> result;
     result.append(static_cast<std::uint8_t>(0));
 
     std::size_t local_var_count = to_postfix_impl<memory_buffer<debug>>(std::move(token_list), result,
-        [this, &jump_indexes](memory_buffer<debug> &buf, std::string_view token, op_code code, bool is_operator) {
-            buf.append(code);
+        [this, &jump_indexes, &while_indexes](memory_buffer<debug> &buf, std::string_view token, op_code code, bool is_operator) {
+            switch(code) {
+            case op_code::left_paren:
+            case op_code::right_paren:
+            case op_code::colon:
+            case op_code::block_end:
+            case op_code::while_cond:
+                break;
+            default:
+                buf.append(code);
+            }
 
             switch(code) {
+            case op_code::while_cond:
+                while_indexes.push(buf.size());
+                break;
+            case op_code::while_start:
             case op_code::if_start:
                 jump_indexes.push(buf.append(static_cast<std::uint32_t>(0)));
                 break;
+            case op_code::while_block: {
+                std::size_t jump_index = pop(while_indexes);
+                std::cout << "And appending: " << jump_index << std::endl;
+                buf.append(static_cast<std::uint32_t>(jump_index));
+
+                jump_index = pop(jump_indexes);
+                std::cout << "Patching: " << jump_index << " with " << buf.size() << std::endl;
+                buf.patch(jump_index, static_cast<std::uint32_t>(buf.size()));
+                break;
+            }
             case op_code::if_block: {
                 std::size_t jump_index = pop(jump_indexes);
                 std::cout << "Patching: " << jump_index << " with " << buf.size() << std::endl;
@@ -255,15 +278,18 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
         switch(op_type.code) {
         case op_code::colon:
             throw std::runtime_error("`:` was not expected here");
+        case op_code::while_cond:
         case op_code::if_start:
             if(!token_pairs.empty() && token_pairs.top() != op_code::block_start)
                 throw std::runtime_error(token + " is not expected here"s);
             token_pairs.push(op_type.code);
+            in_binary_context = false;
             expect_token = "(";
             break;
         case op_code::semicolon:
-            if(!token_pairs.empty() && token_pairs.top() == op_code::if_block) {
-                find_pair(token_pairs, op_codes, lookup_operation(op_code::if_block), op_code::if_block, op_code::none, result, accum);
+            if(!token_pairs.empty() && (token_pairs.top() == op_code::if_block || token_pairs.top() == op_code::while_block)) {
+                op_code top = token_pairs.top();
+                find_pair(token_pairs, op_codes, lookup_operation(top), top, op_code::none, result, accum);
                 continue;
             }
             break;
@@ -280,10 +306,12 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
             continue;
         case op_code::right_paren:
             find_pair(token_pairs, op_codes, op_type, op_code::func_call, op_code::left_paren, result, accum);
-            if(!token_pairs.empty() && token_pairs.top() == op_code::if_start) {
-                accum(result, lookup_operation(op_code::if_start).symbol, op_code::if_start, false);
-                token_pairs.top() = op_code::if_block;
-                op_codes.push(op_code::if_block);
+            if(!token_pairs.empty() && (token_pairs.top() == op_code::if_start || token_pairs.top() == op_code::while_cond)) {
+                op_code current_code = (token_pairs.top() == op_code::if_start ? op_code::if_start : op_code::while_start);
+                accum(result, lookup_operation(current_code).symbol, current_code, false);
+                op_code new_code = (token_pairs.top() == op_code::if_start ? op_code::if_block : op_code::while_block);
+                token_pairs.top() = new_code;
+                op_codes.push(new_code);
                 expect_token = "{";
                 in_binary_context = false;
             }
@@ -293,11 +321,12 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
             continue;
         case op_code::map_end:
             find_pair(token_pairs, op_codes, op_type, op_code::map_start, op_code::block_start, result, accum);
-            if(!token_pairs.empty() && token_pairs.top() == op_code::if_block) { 
-                accum(result, lookup_operation(op_code::if_block).symbol, op_code::if_block, true);
+            if(!token_pairs.empty() && (token_pairs.top() == op_code::if_block || token_pairs.top() == op_code::while_block)) { 
+                op_code top = token_pairs.top();
+                accum(result, lookup_operation(top).symbol, top, true);
                 token_pairs.pop();
-                if(pop(op_codes) != op_code::if_block)      // TODO: remove?
-                    throw std::logic_error("expected if_block");
+                if(pop(op_codes) != top)      // TODO: remove?
+                    throw std::logic_error("expected while/if_block");
             }
             continue;
         default: 
@@ -320,8 +349,10 @@ std::size_t compiler::to_postfix_impl(std::vector<std::string_view> token_list, 
             op_codes.pop();
         }
 
-        if(op_type.code == op_code::if_start) {
+        if(op_type.code == op_code::if_start || op_type.code == op_code::while_start) {
             /* do nothing */
+        } else if(op_type.code == op_code::while_cond) {
+            accum(result, "while", op_code::while_cond, false);
         } else if(op_type.code == op_code::comma) {
             if(token_pairs.empty())
                 throw std::runtime_error("Comma not within (), [] or {}");

@@ -88,7 +88,7 @@ bool binary_comp(op_code code, const object &left, const object &right) {
             } else {
                 throw std::runtime_error("Performing "s + lookup_operation(code).symbol + " between different types");
             }
-        }, left.value(), right.value());
+        }, left.to_int(), right.to_int());//, left.value(), right.value()); // TODO: revert!
     }
 }
 
@@ -147,7 +147,7 @@ object binary_arithmetic(op_code code, const object &left, const object &right) 
                     throw std::logic_error("Invalid binary_arithmetic op: "s + lookup_operation(code).symbol);
                 }
             }
-        }, left.non_null_value(), right.non_null_value());
+        }, left.to_int(), right.to_int());//left.non_null_value(), right.non_null_value()); // TODO: revert!
     }
 }
 
@@ -181,6 +181,11 @@ std::string interpreter::execute(const std::vector<char> &program) {
         case op_code::right_paren:
         case op_code::colon:
         case op_code::block_end:
+        case op_code::while_cond:
+            break;
+        case op_code::while_block:
+            pop(operands);
+            buffer.seek_abs(*buffer.read<std::uint32_t>());
             break;
         case op_code::if_block:
             pop(operands);
@@ -220,6 +225,7 @@ std::string interpreter::execute(const std::vector<char> &program) {
             map_add(operands);
             break;
         case op_code::if_start:
+        case op_code::while_start:
             execute_control_statement(buffer, operands, code);
             break;
         default:
