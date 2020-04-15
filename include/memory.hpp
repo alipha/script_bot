@@ -45,7 +45,7 @@ public:
 
     void push_frame(std::size_t size) {
         for(std::size_t i = 0; i < size; i++)
-            local_var_stack.push_back(object::type(std::monostate())); //make_lvalue()); // TODO: revert!
+            local_var_stack.push_back(make_lvalue());
         frames.push(frame(size, temps_stack.size()));
     }
 
@@ -64,7 +64,7 @@ public:
         frames.pop();
     }
 
-    lvalue_ref get_local_var(std::size_t index) { // TODO: revert! (var_ref)
+    var_ref get_local_var(std::size_t index) {
         if constexpr(debug) {
             if(frames.empty())
                 throw std::logic_error("get_local_var: no stack frames!");
@@ -76,7 +76,7 @@ public:
                     + std::to_string(index) + ", local_var size: " + std::to_string(local_var_stack.size()));
         }
 
-        return &local_var_stack[local_var_stack.size() - index];  // TODO: revert! (remove &)
+        return local_var_stack[local_var_stack.size() - index];
     }
 
 private:
@@ -86,7 +86,7 @@ private:
 
     std::unordered_map<std::string, var_ref> globals;
     std::vector<object> temps_stack;
-    std::vector<object> local_var_stack;  // TODO: revert! (var_ref)
+    std::vector<var_ref> local_var_stack;
     std::stack<frame> frames;
 };
 

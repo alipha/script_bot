@@ -88,7 +88,7 @@ bool binary_comp(op_code code, const object &left, const object &right) {
             } else {
                 throw std::runtime_error("Performing "s + lookup_operation(code).symbol + " between different types");
             }
-        }, left.to_int(), right.to_int());//, left.value(), right.value()); // TODO: revert!
+        }, left.value(), right.value());
     }
 }
 
@@ -147,7 +147,7 @@ object binary_arithmetic(op_code code, const object &left, const object &right) 
                     throw std::logic_error("Invalid binary_arithmetic op: "s + lookup_operation(code).symbol);
                 }
             }
-        }, left.to_int(), right.to_int());//left.non_null_value(), right.non_null_value()); // TODO: revert!
+        }, left.non_null_value(), right.non_null_value());
     }
 }
 
