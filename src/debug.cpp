@@ -7,6 +7,6 @@ void debug_throw(const std::string &message) { throw std::logic_error(message); 
 
 #else
 
-void debug_throw(const std::string &message) {}
+void debug_throw(const std::string &) {}
 
 #endif
