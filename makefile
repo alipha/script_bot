@@ -9,6 +9,7 @@ TARGET   := script_bot
 INCLUDE  := -Iinclude/
 SRC      :=                      \
    $(wildcard src/*.cpp)         \
+   $(wildcard src/*/*.cpp)       \
 
 OBJECTS  := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 DEPS  := $(SRC:%.cpp=$(DEP_DIR)/%.d)
@@ -24,10 +25,14 @@ $(APP_DIR)/$(TARGET): $(OBJECTS) $(DEPS)
 	$(CXX) $(CXXFLAGS) -o $(APP_DIR)/$(TARGET) $(OBJECTS) $(LDFLAGS)
 
 $(DEP_DIR)/%.d: %.cpp
+	@mkdir -p $(@D)
 	@set -e; rm -f $@; \
 	$(CXX) -MM $(INCLUDE) $< > $@.$$$$; \
-	sed 's,\([a-z_]*\)\.o[ :]*,$(OBJ_DIR)/src/\1.o $@ : ,g' < $@.$$$$ > $@; \
+	sed 's,\([a-z_]*\)\.o[ :]*,$(@D:build/deps/%=build/objects/%)/\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
+
+#sed 's,\([a-z_]*\)\.o[ :]*,$(OBJ_DIR)/src/\1.o $(OBJ_DIR)/src/executor/\1.o $@ : ,g' < $@.$$$$ > $@; \
+#rm -f $@.$$$$
 
 .PHONY: all build clean debug release
 
@@ -35,7 +40,7 @@ build:
 	@mkdir -p $(APP_DIR)
 	@mkdir -p $(OBJ_DIR)
 	@mkdir -p $(DEP_DIR)
-	@mkdir -p $(DEP_DIR)/src
+#	@mkdir -p $(DEP_DIR)/src
 
 debug: CXXFLAGS += -DDEBUG -g
 debug: all
@@ -48,5 +53,6 @@ clean:
 	-@rm -rvf $(APP_DIR)/*
 	-@rm -rvf $(DEP_DIR)/*
 
-include $(wildcard $(DEP_DIR)/src/*.d)
+include $(wildcard $(DEP_DIR)/src/*.d) $(wildcard $(DEP_DIR)/src/*/*.d)
+
 

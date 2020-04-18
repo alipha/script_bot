@@ -1,0 +1,35 @@
+#include "executor.hpp"
+#include "object.hpp"
+#include "operation_type.hpp"
+#include "string_util.hpp"
+
+#include <stdexcept>
+#include <string>
+#include <variant>
+
+
+using namespace std::string_literals;
+
+
+namespace executor {
+
+
+object binary_int_op(op_code code, const object &left, const object &right) {
+    
+    return std::visit([code](auto &&l, auto &&r) -> object::type {
+        switch(code) {
+        case op_code::mod: return l % r;
+        case op_code::bit_and: return l & r;
+        case op_code::bit_xor: return l ^ r;
+        case op_code::bit_or: return l | r;
+        case op_code::shl: return l << r;
+        case op_code::shr: return l >> r;
+        default:
+            throw std::logic_error("Invalid binary_int_op: "s + lookup_operation(code).symbol);
+        }
+    }, left.to_int(), right.to_int());
+}
+    
+
+} // namespace executor
+
