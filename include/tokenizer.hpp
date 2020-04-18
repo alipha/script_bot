@@ -1,6 +1,7 @@
 #ifndef LIPH_TOKENIZER_HPP
 #define LIPH_TOKENIZER_HPP
 
+#include <cctype>
 #include <string>
 #include <string_view>
 #include <utility>

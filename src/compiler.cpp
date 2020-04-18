@@ -1,8 +1,10 @@
 #include "compiler.hpp"
+#include "debug.hpp"
 #include "memory_buffer.hpp"
 #include "operation_type.hpp"
 #include "tokenizer.hpp"
-#include "util.hpp"
+#include "stack_util.hpp"
+#include "string_util.hpp"
 
 #include <cstdint>
 #include <cstring>

@@ -1,9 +1,12 @@
 #include "interpreter.hpp"
+#include "debug.hpp"
+#include "conversion.hpp"
 #include "memory.hpp"
 #include "memory_buffer.hpp"
 #include "object.hpp"
 #include "operation_type.hpp"
-#include "util.hpp"
+#include "stack_util.hpp"
+#include "string_util.hpp"
 
 #include <cmath>
 #include <cstdint>

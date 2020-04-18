@@ -3,7 +3,7 @@
 #include "interpreter.hpp"
 #include "irc.hpp"
 #include "memory.hpp"
-#include "util.hpp"
+#include "string_util.hpp"
 
 #include <iostream>
 #include <string>

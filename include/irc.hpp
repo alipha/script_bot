@@ -1,14 +1,16 @@
 #ifndef LIPH_IRC_HPP
 #define LIPH_IRC_HPP
 
-#include <boost/asio.hpp>
-#include <iostream>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
 
 
 using pos_size_pair = std::pair<std::size_t, std::size_t>;
+
+
+class irc_client_impl;
 
 
 class irc_message {
@@ -43,7 +45,8 @@ private:
 
 class irc_client {
 public:
-    irc_client() : context(), sock(context), sock_buf(), sock_stream(&sock_buf) {}
+    irc_client();
+    ~irc_client();
 
     void login();
 
@@ -54,10 +57,7 @@ public:
     irc_message read();
     
 private:
-    boost::asio::io_service context;
-    boost::asio::ip::tcp::socket sock;
-    boost::asio::streambuf sock_buf;
-    std::istream sock_stream;
+    std::unique_ptr<irc_client_impl> impl;
 };
 
 

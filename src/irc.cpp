@@ -1,15 +1,36 @@
 #include "irc.hpp"
-#include "util.hpp"
+#include "string_util.hpp"
 
 #include <cstddef>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <boost/asio.hpp>
 
 
 using boost::asio::ip::tcp;
 using namespace std::string_literals;
+
+
+
+class irc_client_impl {
+public:
+    irc_client_impl() : context(), sock(context), sock_buf(), sock_stream(&sock_buf) {}
+
+    void login();
+    void write(std::string_view message);
+
+    irc_message read();
+    
+private:
+    boost::asio::io_service context;
+    boost::asio::ip::tcp::socket sock;
+    boost::asio::streambuf sock_buf;
+    std::istream sock_stream;
+};
+
 
 
 pos_size_pair irc_message::tokenize(std::size_t &pos) {
@@ -67,7 +88,18 @@ void irc_message::parse() {
 }
 
 
-void irc_client::login() {
+irc_client::irc_client() : impl(std::make_unique<irc_client_impl>()) {}
+irc_client::~irc_client() {}
+
+void irc_client::login() { impl->login(); }
+
+void irc_client::write(std::string_view message) { impl->write(message); }
+
+irc_message irc_client::read() { return impl->read(); }
+
+
+
+void irc_client_impl::login() {
     tcp::resolver resolver(context);
     tcp::resolver::query query("irc.freenode.net", "6667", tcp::resolver::query::numeric_service);
     
@@ -94,7 +126,7 @@ void irc_client::login() {
 }
 
 
-void irc_client::write(std::string_view message) {
+void irc_client_impl::write(std::string_view message) {
     if(message.size() > 425)
         message = message.substr(0, 425);
     std::cout << '>' << message << std::endl;
@@ -103,7 +135,7 @@ void irc_client::write(std::string_view message) {
 }
 
 
-irc_message irc_client::read() {    
+irc_message irc_client_impl::read() {    
     irc_message msg;
     std::string line;
 
