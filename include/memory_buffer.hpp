@@ -49,26 +49,27 @@ public:
         return result;
     }
 
-    void append(const char *str, std::size_t len) {
+    std::size_t append(const char *str, std::size_t len) {
         if(len > std::numeric_limits<std::uint16_t>::max())
             throw std::runtime_error("text is too long. len = " + std::to_string(len));
-        append(static_cast<std::uint16_t>(len));
+        std::size_t loc = append(static_cast<std::uint16_t>(len));
 
         std::size_t current_len = buf.size();
         buf.resize(current_len + len);   // TODO: check for overflow?
         std::copy(str, str + len, &buf[current_len]);
+        return loc;
     }
 
     template<typename T>
-    void append(T &&value) {    // TODO: emplace_back?
+    std::size_t append(T &&value) {    // TODO: emplace_back?
         using TObj = std::decay_t<T>;
 
         if constexpr(std::is_same_v<TObj, std::string_view>) {
-            append(value.data(), value.size());
+            return append(value.data(), value.size());
         } else if constexpr(std::is_same_v<TObj, std::string>) {
-            append(value.data(), value.size());
+            return append(value.data(), value.size());
         } else if constexpr(std::is_same_v<TObj, const char*> || std::is_same_v<TObj, char*>) {
-            append(value, std::strlen(value));
+            return append(value, std::strlen(value));
         } else {
             std::size_t len = buf.size();
             std::size_t misalignment = len % alignof(TObj);
@@ -76,7 +77,17 @@ public:
                 len += alignof(TObj) - misalignment;
             buf.resize(len + sizeof(TObj)); // TODO: check for overflow? and for misalignment above?
             new (&buf[len]) TObj(std::forward<T>(value));
+            return len;
         }
+    }
+
+    template<typename T>
+    void patch(std::size_t location, T &&value) {
+        using TObj = std::decay_t<T>;
+        if(BoundsCheck && location + sizeof(TObj) > buf.size())
+            throw std::logic_error("out of bounds patch with location=" + std::to_string(location) + 
+                    ", len=" + std::to_string(sizeof(TObj)) + ", size=" + std::to_string(buf.size())); // TODO: runtime_error?
+        new (&buf[location]) TObj(std::forward<T>(value));
     }
 
     void seek_abs(std::size_t location) { pos = location; }
