@@ -1,7 +1,7 @@
 CXX      := g++-9.1
-CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror -Wno-psabi -std=c++17
+CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror -Wno-psabi -std=c++17 -march=native
 LDFLAGS  := -pthread -lboost_system
-BUILD    := ./build
+BUILD    := build
 OBJ_DIR  := $(BUILD)/objects
 DEP_DIR  := $(BUILD)/deps
 APP_DIR  := $(BUILD)/apps
@@ -28,11 +28,8 @@ $(DEP_DIR)/%.d: %.cpp
 	@mkdir -p $(@D)
 	@set -e; rm -f $@; \
 	$(CXX) -MM $(INCLUDE) $< > $@.$$$$; \
-	sed 's,\([a-z_]*\)\.o[ :]*,$(@D:build/deps/%=build/objects/%)/\1.o $@ : ,g' < $@.$$$$ > $@; \
+	sed 's,\([a-z_]*\)\.o[ :]*,$(@D:$(DEP_DIR)/%=$(OBJ_DIR)/%)/\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
-
-#sed 's,\([a-z_]*\)\.o[ :]*,$(OBJ_DIR)/src/\1.o $(OBJ_DIR)/src/executor/\1.o $@ : ,g' < $@.$$$$ > $@; \
-#rm -f $@.$$$$
 
 .PHONY: all build clean debug release
 
@@ -40,7 +37,6 @@ build:
 	@mkdir -p $(APP_DIR)
 	@mkdir -p $(OBJ_DIR)
 	@mkdir -p $(DEP_DIR)
-#	@mkdir -p $(DEP_DIR)/src
 
 debug: CXXFLAGS += -DDEBUG -g
 debug: all

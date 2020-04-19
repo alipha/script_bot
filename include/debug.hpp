@@ -12,7 +12,7 @@ constexpr bool debug = false
 
 
 void debug_throw(const std::string &message);
-
+void debug_out(const std::string &message);
 
 #endif
 

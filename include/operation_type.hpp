@@ -120,6 +120,8 @@ struct operation_type {
 operation_type lookup_operation(std::string_view symbol, bool in_binary_context);
 operation_type lookup_operation(op_code code);
 
+bool has_lower_precedence(op_code current_code, op_code top_code);
+
 
 inline bool is_binary_op(op_code code) {
     return code >= op_code::dot && code <= op_code::div_assign;

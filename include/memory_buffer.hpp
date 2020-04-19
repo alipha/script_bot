@@ -96,9 +96,20 @@ public:
         pos += amount;  // TODO: check for overflow?
         bounds_check(0); 
     }
+
+    void clear() {
+        buf.clear();
+        pos = 0;
+    }
     
-    std::vector<char> &buffer() { return buf; }
-    const std::vector<char> &buffer() const { return buf; }
+    std::vector<char> buffer() && {
+        std::vector<char> ret(std::move(buf));
+        clear();
+        return ret;
+    }
+
+    std::vector<char> &buffer() & { return buf; }
+    const std::vector<char> &buffer() const & { return buf; }
 
     std::size_t position() const { return pos; }
     std::size_t size() const { return buf.size(); }

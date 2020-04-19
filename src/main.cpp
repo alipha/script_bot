@@ -40,7 +40,7 @@ std::string run(compiler &c, interpreter &i, std::string_view code) {
 
 int main(int argc, char* argv[]) {
     memory m;
-    compiler c(&m);
+    compiler c(&m, true);
     interpreter i(&m);
 
     if(argc > 1 && argv[1] == std::string_view("irc")) {
@@ -72,9 +72,12 @@ int main(int argc, char* argv[]) {
             std::cout << '"' << token << '"' << std::endl;
 
         std::cout << std::endl;
-        std::cout << c.to_postfix(t.tokens()) << std::endl;
-        std::cout << to_hex(c.compile(t.tokens())) << std::endl;
-        std::cout << "Result: " << i.execute(c.compile(t.tokens())) << std::endl;
+
+        std::vector<char> code = c.compile(t.tokens());
+
+        std::cout << c.tokenized() << std::endl;
+        std::cout << to_hex(code) << std::endl;
+        std::cout << "Result: " << i.execute(code) << std::endl;
     }
 
     return 0;

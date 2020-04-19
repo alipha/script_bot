@@ -163,3 +163,12 @@ operation_type lookup_operation(op_code code) {
     return operation_types[code_index];
 }
 
+
+bool has_lower_precedence(op_code current_code, op_code top_code) {
+    operation_type current = lookup_operation(current_code);
+    operation_type top = lookup_operation(top_code);
+
+    return current.precedence < top.precedence 
+        || (current.precedence == top.precedence && top.associativity == associative::left);
+}
+
