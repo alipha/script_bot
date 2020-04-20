@@ -26,9 +26,10 @@ using namespace std::string_literals;
 
 class compiler_impl {
 public:
-    compiler_impl(memory *m, bool generate_tokenized) : mem(m), gen_tokenized(generate_tokenized) {}
+    compiler_impl(memory *m, tokenizer *t, bool generate_tokenized) 
+        : mem(m), tokenizer(t), gen_tokenized(generate_tokenized) {}
 
-    std::vector<char> compile(std::vector<std::string_view> token_list);
+    std::vector<char> compile(std::string &&program);
     
     const std::string &tokenized() const { return tokenized_result; }
 
@@ -41,7 +42,8 @@ private:
     std::uint8_t local_var_index(std::string_view name);
 
 
-    void reset() {
+    void clear() {
+        tokenizer->clear();
         local_var_indexes.clear();
         jump_indexes = {};
         while_indexes = {};
@@ -54,6 +56,7 @@ private:
     }
 
     memory *mem;
+    tokenizer *tokenizer;
     bool gen_tokenized;
     std::unordered_map<std::string, std::uint8_t> local_var_indexes;
 
@@ -73,8 +76,8 @@ compiler::compiler(memory *m, bool generate_tokenized)
 
 compiler::~compiler() {}
 
-std::vector<char> compiler::compile(std::vector<std::string_view> token_list) {
-    return impl->compile(std::move(token_list));
+std::vector<char> compiler::compile(std::string program) {
+    return impl->compile(std::move(program));
 }
 
 const std::string &compiler::tokenized() const { return impl->tokenized(); }
@@ -222,8 +225,9 @@ void compiler_impl::find_pair(operation_type current, op_code target, op_code ta
 }
 
 
-std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_list) {
-    reset();
+std::vector<char> compiler_impl::compile(std::string &&program) {
+    clear();
+    tokenizer->reset(std::move(program));
 
     op_code last_code = op_code::none;
     bool in_binary_context = false;
@@ -233,7 +237,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
     if(tokens.back() != ";")
         tokens.push_back(";");
 
-    for(auto token : tokens) {
+    for(auto [token, pos] : tokenizer) {
         if(expect_token != "") {
             if(expect_token == "{") {
                 if(token == "{") {

@@ -28,10 +28,9 @@ std::string to_hex(const std::vector<char> &bytes) {
 }
 
 
-std::string run(compiler &c, interpreter &i, std::string_view code) {
+std::string run(compiler &c, interpreter &i, std::string_view program) {
     try {
-        tokenizer t(std::string(code.data(), code.size()));
-        return i.execute(c.compile(t.tokens()));
+        return i.execute(c.compile(program));
     } catch(std::exception &e) {
         return "Error: "s + e.what();
     }
@@ -40,7 +39,8 @@ std::string run(compiler &c, interpreter &i, std::string_view code) {
 
 int main(int argc, char* argv[]) {
     memory m;
-    compiler c(&m, true);
+    tokenizer t;
+    compiler c(&m, &t, true);
     interpreter i(&m);
 
     if(argc > 1 && argv[1] == std::string_view("irc")) {
@@ -67,17 +67,17 @@ int main(int argc, char* argv[]) {
         std::cout << "Input: ";
         std::getline(std::cin, line);
 
-        tokenizer t(std::move(line));
-        for(std::string_view token : t.tokens())
+        tokenizer t(line);
+        for(auto [token, pos] : t)
             std::cout << '"' << token << '"' << std::endl;
 
         std::cout << std::endl;
 
-        std::vector<char> code = c.compile(t.tokens());
+        std::vector<char> program = c.compile(std::move(line));
 
         std::cout << c.tokenized() << std::endl;
-        std::cout << to_hex(code) << std::endl;
-        std::cout << "Result: " << i.execute(code) << std::endl;
+        std::cout << to_hex(program) << std::endl;
+        std::cout << "Result: " << i.execute(program) << std::endl;
     }
 
     return 0;

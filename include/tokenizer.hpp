@@ -8,19 +8,32 @@
 #include <vector>
 
 
+struct token_value {
+    std::string_view token;
+    std::size_t pos;
+};
+
+
 class tokenizer {
 public:
-    tokenizer(std::string source) : src(std::move(source)) { tokenize(); }
+    using value_type = token_value;
 
-    tokenizer(const tokenizer &) = delete;
-    tokenizer(tokenizer &&) = delete;
-    tokenizer &operator=(const tokenizer &) = delete;
-    tokenizer &operator=(tokenizer &&) = delete;
+    tokenizer() {}
+    tokenizer(std::string source) : src(std::move(source)), pos(0) {}
 
     const std::string &source() const { return src; }
-    const std::vector<std::string_view> &tokens() const { return toks; }
 
     static bool is_identifier(char ch) { return std::isalpha(ch) || ch == '_' || ch == '$'; }
+
+    class iterator {
+    public:
+        token_value 
+    private:
+        tokenizer *t;
+        char *token_begin;
+        char *token_end;
+        stage next_stage;
+    };
 
 private:
     enum class stage {
@@ -36,7 +49,7 @@ private:
     void tokenize();
 
     std::string src;
-    std::vector<std::string_view> toks;
+    std::size_t pos;
 };
 
 #endif
