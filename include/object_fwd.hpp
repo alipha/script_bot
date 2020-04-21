@@ -7,7 +7,7 @@
 #include <vector>
 
 
-struct object;
+class object;
 
 
 using string_ref = std::shared_ptr<std::string>;

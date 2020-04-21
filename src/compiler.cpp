@@ -425,7 +425,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
         throw std::runtime_error("Too many local variables: " + std::to_string(local_var_count));
     }
 
-    result.buffer()[0] = local_var_count;
+    result.buffer()[0] = static_cast<char>(local_var_count);
     return std::move(result).buffer();
 }
 
