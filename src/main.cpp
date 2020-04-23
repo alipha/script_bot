@@ -67,6 +67,9 @@ int main(int argc, char* argv[]) {
         std::cout << "Input: ";
         std::getline(std::cin, line);
 
+        if(line == "quit")
+            return 0;
+
         tokenizer t(std::move(line));
         for(std::string_view token : t.tokens())
             std::cout << '"' << token << '"' << std::endl;
@@ -79,6 +82,5 @@ int main(int argc, char* argv[]) {
         std::cout << to_hex(code) << std::endl;
         std::cout << "Result: " << i.execute(code) << std::endl;
     }
-
-    return 0;
 }
+

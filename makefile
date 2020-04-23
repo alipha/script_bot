@@ -1,4 +1,4 @@
-CXX      := g++-9.1
+CXX      := g++-8
 CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror -Wno-psabi -std=c++17 -march=native
 LDFLAGS  := -pthread -lboost_system
 BUILD    := build
@@ -38,7 +38,7 @@ build:
 	@mkdir -p $(OBJ_DIR)
 	@mkdir -p $(DEP_DIR)
 
-debug: CXXFLAGS += -DDEBUG -g
+debug: CXXFLAGS += -DDEBUG -g -D_GLIBCXX_DEBUG -ggdb -fno-omit-frame-pointer -fsanitize=undefined -fsanitize=address -fsanitize=leak
 debug: all
 
 release: CXXFLAGS += -O2
