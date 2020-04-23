@@ -4,12 +4,13 @@
 #include <cstdint>
 #include <string_view>
 
-//
+
 enum class op_category : std::uint8_t {
     integer,
     comparison,
     arithmetic,
     assignment,
+    control,
     other
 };
 
@@ -25,66 +26,69 @@ enum class op_code : std::uint8_t {
     gte,
     eq,        // 08
     neq,
-    logic_and,
-    logic_or,
-    array_add,  // 0c
-    map_add,
-    comma,
-    colon,
-    semicolon,  // 10
     mod,
     bit_and,
-    bit_xor,
-    bit_or,     // 14
+    bit_xor,   // 0c
+    bit_or,
     shl,
     shr,
-    pow,
-    add,        // 18
+    pow,       // 10
+    add,
     sub,
     mul,
-    div,
-    assign,     // 1c
+    div,       // 14
+    assign,
     mod_assign,
     and_assign,
-    xor_assign,
-    or_assign,  // 20
+    xor_assign, // 18
+    or_assign,  
     shl_assign,
     shr_assign,
-    pow_assign,
-    add_assign, // 24
+    pow_assign, // 1c
+    add_assign,
     sub_assign,
     mul_assign,
-    div_assign,
-    pre_inc,    // 28
+    div_assign, // 20
+    pre_inc,
     pre_dec,
     post_inc,
-    post_dec,
-    bit_not,    // 2c
+    post_dec,   // 24
+    bit_not,
     logic_not,
     plus,
-    negate,
-    left_paren,  // 30
+    negate,     // 28
+    logic_and,
+    logic_and_end,
+    logic_or,
+    logic_or_end, // 2c
+    array_add,
+    map_add,
+    comma,
+    colon,       // 30
+    semicolon,
+    left_paren,
     right_paren,
-    array_start,
+    array_start, // 34
     array_end,
-    block_start, // 34
+    block_start,
     map_start,
-    block_end,
+    block_end,   // 38
     map_end,
-    if_start,    // 38
-    if_block,
+    if_start,
+    if_cond,
+    if_end,      // 3c
     while_start,
-    while_block,
-    while_cond,  // 3c
-    count,
+    while_cond,
+    while_end,
+    count,       // 40
 
     global_var,
     local_var,
-    int_lit,     // 40
-    uint_lit,
+    int_lit,
+    uint_lit,   // 44
     float_lit,
     str_lit,
-    null_lit     // 44
+    null_lit
 };
 
 
@@ -114,6 +118,9 @@ struct operation_type {
     int precedence;
     op_category category;
     op_code code;
+    op_code replace_with;
+    bool has_left_pair;
+    op_code right_pair;
 };
 
 

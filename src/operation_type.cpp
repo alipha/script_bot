@@ -14,67 +14,71 @@ using namespace std::string_literals;
 
 
 operation_type operation_types[] = {
-    {"",    true,  0, associative::left,    0, op_category::other,      op_code::none},
-    {".",   true,  2, associative::left,  900, op_category::other,      op_code::dot},
-    {"(",   true,  2, associative::left,  100, op_category::other,      op_code::func_call},
-    {"[",   true,  2, associative::left,  100, op_category::other,      op_code::index},
-    {"<",   true,  2, associative::left,  450, op_category::comparison, op_code::lt},
-    {"<=",  true,  2, associative::left,  450, op_category::comparison, op_code::lte},
-    {">",   true,  2, associative::left,  450, op_category::comparison, op_code::gt},
-    {">=",  true,  2, associative::left,  450, op_category::comparison, op_code::gte},
-    {"==",  true,  2, associative::left,  450, op_category::comparison, op_code::eq},
-    {"!=",  true,  2, associative::left,  450, op_category::comparison, op_code::neq},
-    {"&&",  true,  2, associative::left,  300, op_category::comparison, op_code::logic_and},
-    {"||",  true,  2, associative::left,  275, op_category::comparison, op_code::logic_or},
-    {",",   true,  2, associative::left,  150, op_category::other,      op_code::array_add},
-    {",",   true,  2, associative::left,  150, op_category::other,      op_code::map_add},
-    {",",   true,  2, associative::left,  150, op_category::other,      op_code::comma},
-    {":",   true,  2, associative::left,  170, op_category::other,      op_code::colon},
-    {";",   true,  2, associative::left,   10, op_category::other,      op_code::semicolon},
-    {"%",   true,  2, associative::left,  550, op_category::integer,    op_code::mod},
-    {"&",   true,  2, associative::left,  375, op_category::integer,    op_code::bit_and},
-    {"^",   true,  2, associative::left,  350, op_category::integer,    op_code::bit_xor},
-    {"|",   true,  2, associative::left,  325, op_category::integer,    op_code::bit_or},
-    {"<<",  true,  2, associative::left,  475, op_category::integer,    op_code::shl},
-    {">>",  true,  2, associative::left,  475, op_category::integer,    op_code::shr},
-    {"**",  true,  2, associative::left,  575, op_category::arithmetic, op_code::pow},
-    {"+",   true,  2, associative::left,  500, op_category::arithmetic, op_code::add},
-    {"-",   true,  2, associative::left,  500, op_category::arithmetic, op_code::sub},
-    {"*",   true,  2, associative::left,  550, op_category::arithmetic, op_code::mul},
-    {"/",   true,  2, associative::left,  550, op_category::arithmetic, op_code::div},
-    {"=",   true,  2, associative::right, 200, op_category::assignment, op_code::assign},
-    {"%=",  true,  2, associative::right, 200, op_category::assignment, op_code::mod_assign},
-    {"&=",  true,  2, associative::right, 200, op_category::assignment, op_code::and_assign},
-    {"^=",  true,  2, associative::right, 200, op_category::assignment, op_code::xor_assign},
-    {"|=",  true,  2, associative::right, 200, op_category::assignment, op_code::or_assign},
-    {"<<=", true,  2, associative::right, 200, op_category::assignment, op_code::shl_assign},
-    {">>=", true,  2, associative::right, 200, op_category::assignment, op_code::shr_assign},
-    {"**=", true,  2, associative::right, 200, op_category::assignment, op_code::pow_assign},
-    {"+=",  true,  2, associative::right, 200, op_category::assignment, op_code::add_assign},
-    {"-=",  true,  2, associative::right, 200, op_category::assignment, op_code::sub_assign},
-    {"*=",  true,  2, associative::right, 200, op_category::assignment, op_code::mul_assign},
-    {"/=",  true,  2, associative::right, 200, op_category::assignment, op_code::div_assign},
-    {"++",  false, 1, associative::right, 600, op_category::assignment, op_code::pre_inc},
-    {"--",  false, 1, associative::right, 600, op_category::assignment, op_code::pre_dec},
-    {"++",  true,  1, associative::left,  700, op_category::assignment, op_code::post_inc},
-    {"--",  true,  1, associative::left,  700, op_category::assignment, op_code::post_dec},
-    {"~",   false, 1, associative::right, 600, op_category::integer,    op_code::bit_not},
-    {"!",   false, 1, associative::right, 600, op_category::comparison, op_code::logic_not},
-    {"+",   false, 1, associative::right, 600, op_category::integer,    op_code::plus},
-    {"-",   false, 1, associative::right, 600, op_category::arithmetic, op_code::negate},
-    {"(",   false, 1, associative::left,  100, op_category::other,      op_code::left_paren},
-    {")",   true,  1, associative::left,  100, op_category::other,      op_code::right_paren},
-    {"[",   false, 1, associative::left,  100, op_category::other,      op_code::array_start},
-    {"]",   true,  1, associative::left,  100, op_category::other,      op_code::array_end},
-    {"{",   false, 1, associative::left,  100, op_category::other,      op_code::block_start},
-    {"{",   false, 1, associative::left,  100, op_category::other,      op_code::map_start},
-    {"}",   true,  1, associative::left,  100, op_category::other,      op_code::block_end},
-    {"}",   true,  1, associative::left,  100, op_category::other,      op_code::map_end},
-    {"if",  true,  1, associative::left,    5, op_category::other,      op_code::if_start},    // TODO: changed binary context
-    {"/if", true,  1, associative::left,    5, op_category::other,      op_code::if_block},
-    {"while/",true,1, associative::left,    5, op_category::other,      op_code::while_start}, // TODO: changed binary context
-    {"/while",true,1, associative::left,    5, op_category::other,      op_code::while_block},
-    {"while", true,1, associative::left,    5, op_category::other,      op_code::while_cond}
+//  symbol  bin? count   associativity   prec        category                code                  replace_with    left_pair?  right_pair
+    {"",    true,  0, associative::left,    0, op_category::other,      op_code::none,         op_code::none,         false, op_code::none},
+    {".",   true,  2, associative::left,  900, op_category::other,      op_code::dot,          op_code::none,         false, op_code::none},
+    {"(",   true,  2, associative::left,  100, op_category::other,      op_code::func_call,    op_code::none,         false, op_code::right_paren},
+    {"[",   true,  2, associative::left,  100, op_category::other,      op_code::index,        op_code::none,         false, op_code::array_end},
+    {"<",   true,  2, associative::left,  450, op_category::comparison, op_code::lt,           op_code::none,         false, op_code::none},
+    {"<=",  true,  2, associative::left,  450, op_category::comparison, op_code::lte,          op_code::none,         false, op_code::none},
+    {">",   true,  2, associative::left,  450, op_category::comparison, op_code::gt,           op_code::none,         false, op_code::none},
+    {">=",  true,  2, associative::left,  450, op_category::comparison, op_code::gte,          op_code::none,         false, op_code::none},
+    {"==",  true,  2, associative::left,  450, op_category::comparison, op_code::eq,           op_code::none,         false, op_code::none},
+    {"!=",  true,  2, associative::left,  450, op_category::comparison, op_code::neq,          op_code::none,         false, op_code::none},
+    {"%",   true,  2, associative::left,  550, op_category::integer,    op_code::mod,          op_code::none,         false, op_code::none},
+    {"&",   true,  2, associative::left,  375, op_category::integer,    op_code::bit_and,      op_code::none,         false, op_code::none},
+    {"^",   true,  2, associative::left,  350, op_category::integer,    op_code::bit_xor,      op_code::none,         false, op_code::none},
+    {"|",   true,  2, associative::left,  325, op_category::integer,    op_code::bit_or,       op_code::none,         false, op_code::none},
+    {"<<",  true,  2, associative::left,  475, op_category::integer,    op_code::shl,          op_code::none,         false, op_code::none},
+    {">>",  true,  2, associative::left,  475, op_category::integer,    op_code::shr,          op_code::none,         false, op_code::none},
+    {"**",  true,  2, associative::left,  575, op_category::arithmetic, op_code::pow,          op_code::none,         false, op_code::none},
+    {"+",   true,  2, associative::left,  500, op_category::arithmetic, op_code::add,          op_code::none,         false, op_code::none},
+    {"-",   true,  2, associative::left,  500, op_category::arithmetic, op_code::sub,          op_code::none,         false, op_code::none},
+    {"*",   true,  2, associative::left,  550, op_category::arithmetic, op_code::mul,          op_code::none,         false, op_code::none},
+    {"/",   true,  2, associative::left,  550, op_category::arithmetic, op_code::div,          op_code::none,         false, op_code::none},
+    {"=",   true,  2, associative::right, 200, op_category::assignment, op_code::assign,       op_code::none,         false, op_code::none},
+    {"%=",  true,  2, associative::right, 200, op_category::assignment, op_code::mod_assign,   op_code::none,         false, op_code::none},
+    {"&=",  true,  2, associative::right, 200, op_category::assignment, op_code::and_assign,   op_code::none,         false, op_code::none},
+    {"^=",  true,  2, associative::right, 200, op_category::assignment, op_code::xor_assign,   op_code::none,         false, op_code::none},
+    {"|=",  true,  2, associative::right, 200, op_category::assignment, op_code::or_assign,    op_code::none,         false, op_code::none},
+    {"<<=", true,  2, associative::right, 200, op_category::assignment, op_code::shl_assign,   op_code::none,         false, op_code::none},
+    {">>=", true,  2, associative::right, 200, op_category::assignment, op_code::shr_assign,   op_code::none,         false, op_code::none},
+    {"**=", true,  2, associative::right, 200, op_category::assignment, op_code::pow_assign,   op_code::none,         false, op_code::none},
+    {"+=",  true,  2, associative::right, 200, op_category::assignment, op_code::add_assign,   op_code::none,         false, op_code::none},
+    {"-=",  true,  2, associative::right, 200, op_category::assignment, op_code::sub_assign,   op_code::none,         false, op_code::none},
+    {"*=",  true,  2, associative::right, 200, op_category::assignment, op_code::mul_assign,   op_code::none,         false, op_code::none},
+    {"/=",  true,  2, associative::right, 200, op_category::assignment, op_code::div_assign,   op_code::none,         false, op_code::none},
+    {"++",  false, 1, associative::right, 600, op_category::assignment, op_code::pre_inc,      op_code::none,         false, op_code::none},
+    {"--",  false, 1, associative::right, 600, op_category::assignment, op_code::pre_dec,      op_code::none,         false, op_code::none},
+    {"++",  true,  1, associative::left,  700, op_category::assignment, op_code::post_inc,     op_code::none,         false, op_code::none},
+    {"--",  true,  1, associative::left,  700, op_category::assignment, op_code::post_dec,     op_code::none,         false, op_code::none},
+    {"~",   false, 1, associative::right, 600, op_category::integer,    op_code::bit_not,      op_code::none,         false, op_code::none},
+    {"!",   false, 1, associative::right, 600, op_category::comparison, op_code::logic_not,    op_code::none,         false, op_code::none},
+    {"+",   false, 1, associative::right, 600, op_category::integer,    op_code::plus,         op_code::none,         false, op_code::none},
+    {"-",   false, 1, associative::right, 600, op_category::arithmetic, op_code::negate,       op_code::none,         false, op_code::none},
+    {"&&",  true,  1, associative::left,  300, op_category::comparison, op_code::logic_and,    op_code::logic_and_end,false, op_code::none},
+    {"/&&", true,  1, associative::left,  300, op_category::comparison, op_code::logic_and_end,op_code::none,         false, op_code::none},
+    {"||",  true,  1, associative::left,  275, op_category::comparison, op_code::logic_or,     op_code::logic_or_end, false, op_code::none},
+    {"/||", true,  1, associative::left,  275, op_category::comparison, op_code::logic_or_end, op_code::none,         false, op_code::none},
+    {",",   true,  1, associative::left,  150, op_category::other,      op_code::array_add,    op_code::none,         false, op_code::none},
+    {",",   true,  1, associative::left,  150, op_category::other,      op_code::map_add,      op_code::none,         false, op_code::none},
+    {",",   true,  1, associative::left,  150, op_category::other,      op_code::comma,        op_code::none,         false, op_code::none},
+    {":",   true,  1, associative::left,  170, op_category::other,      op_code::colon,        op_code::none,         false, op_code::none},
+    {";",   true,  1, associative::left,   10, op_category::other,      op_code::semicolon,    op_code::none,         false, op_code::none},
+    {"(",   false, 1, associative::right, 100, op_category::other,      op_code::left_paren,   op_code::none,         false, op_code::right_paren},
+    {")",   true,  1, associative::left,  100, op_category::other,      op_code::right_paren,  op_code::none,         true,  op_code::none},
+    {"[",   false, 1, associative::right, 100, op_category::other,      op_code::array_start,  op_code::none,         false, op_code::array_end},
+    {"]",   true,  1, associative::left,  100, op_category::other,      op_code::array_end,    op_code::none,         true,  op_code::none},
+    {"{",   false, 1, associative::right, 100, op_category::other,      op_code::block_start,  op_code::none,         false, op_code::map_end},
+    {"{",   false, 1, associative::right, 100, op_category::other,      op_code::map_start,    op_code::none,         false, op_code::map_end},
+    {"}",   true,  1, associative::left,  100, op_category::other,      op_code::block_end,    op_code::none,         true,  op_code::none},
+    {"}",   true,  1, associative::left,  100, op_category::other,      op_code::map_end,      op_code::none,         true,  op_code::none},
+    {"if" , true,  1, associative::left,    5, op_category::control,    op_code::if_start,     op_code::if_cond,      false, op_code::none},
+    {"if?", true,  1, associative::left,    5, op_category::other,      op_code::if_cond,      op_code::if_end,       false, op_code::none},
+    {"/if", true,  1, associative::left,    5, op_category::other,      op_code::if_end,       op_code::none,         false, op_code::none}, 
+    {"while", true,1, associative::left,    5, op_category::control,    op_code::while_start,  op_code::while_cond,   false, op_code::none},
+    {"while?",true,1, associative::left,    5, op_category::other,      op_code::while_cond,   op_code::while_end,    false, op_code::none},
+    {"/while",true,1, associative::left,    5, op_category::other,      op_code::while_end,    op_code::none,         false, op_code::none}
 };
 
 
@@ -146,10 +150,19 @@ std::map<std::pair<std::string_view, bool>, operation_type> symbol_operation_map
 
 operation_type lookup_operation(std::string_view symbol, bool in_binary_context) {
     auto it = symbol_operation_map.find(std::pair(symbol, in_binary_context));
-    if(it == symbol_operation_map.end())
+
+    if(it == symbol_operation_map.end()) {
+        auto it2 = symbol_operation_map.find(std::pair(symbol, !in_binary_context));
+
+        if(it2 != symbol_operation_map.end()) {
+            throw std::runtime_error(it2->second.symbol + " was not expected in "s 
+                    + (in_binary_context ? "binary" : "unary") + " context");
+        }
+
         return operation_types[static_cast<int>(op_code::none)];
-    else
+    } else {
         return it->second;
+    }
 }
 
 
