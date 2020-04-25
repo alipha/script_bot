@@ -35,8 +35,13 @@ public:
 private:
     static std::string parse_str_literal(std::string_view str);
 
-    void accum(std::string_view token, op_code code, bool is_operator);
-    void find_pair(operation_type current, op_code target, op_code target2);
+    void accum(std::string_view token, op_code code) { accum(token, lookup_operation(code)); }
+    void accum(std::string_view token, operation_type op_type);
+    void accum_operand(std::string_view token);
+
+    void pop_op_code(operation_type top);
+    void handle_pair(operation_type op_type, operation_type top_op_type, std::size_t *index);
+    void handle_map_label(std::size_t *index);
 
     std::uint8_t local_var_index(std::string_view name);
 
@@ -45,8 +50,8 @@ private:
         local_var_indexes.clear();
         jump_indexes = {};
         while_indexes = {};
-        token_pairs = {};
         op_codes = {};
+        tokens = {};
         result.clear();
         tokenized_result.clear();
 
@@ -59,8 +64,9 @@ private:
 
     std::stack<std::size_t> jump_indexes;
     std::stack<std::size_t> while_indexes;
-    std::stack<op_code> token_pairs;
     std::stack<op_code> op_codes;
+    std::vector<std::string_view> tokens;
+    //std::vector<std::string_view>::iterator token_it;
 
     memory_buffer<debug> result;
     std::string tokenized_result;
@@ -111,32 +117,26 @@ Int string_to(std::string const & str, size_t * idx = 0, int base = 10) {
 */
 
 
-void compiler_impl::accum(std::string_view token, op_code code, bool is_operator) {
+void compiler_impl::accum(std::string_view token, operation_type op_type) {
     if(gen_tokenized) {
         tokenized_result += token;
         tokenized_result += " ";
     }
 
-    switch(code) {
-    case op_code::left_paren:
-    case op_code::right_paren:
-    case op_code::colon:
-    case op_code::block_end:
-    case op_code::while_cond:
-        break;
-    default:
+    op_code code = op_type.code;
+
+    if(!op_type.is_nop)
         result.append(code);
-    }
 
     switch(code) {
-    case op_code::while_cond:
+    case op_code::while_start:
         while_indexes.push(result.size());
         break;
-    case op_code::while_start:
-    case op_code::if_start:
+    case op_code::while_cond:
+    case op_code::if_cond:
         jump_indexes.push(result.append(static_cast<std::uint32_t>(0)));
         break;
-    case op_code::while_block: {
+    case op_code::while_end: {
         std::size_t jump_index = pop(while_indexes);
         debug_out("And appending: " + std::to_string(jump_index));
         result.append(static_cast<std::uint32_t>(jump_index));
@@ -146,7 +146,7 @@ void compiler_impl::accum(std::string_view token, op_code code, bool is_operator
         result.patch(jump_index, static_cast<std::uint32_t>(result.size()));
         break;
     }
-    case op_code::if_block: {
+    case op_code::if_end: {
         std::size_t jump_index = pop(jump_indexes);
         debug_out("Patching: " + std::to_string(jump_index) + " with " + std::to_string(result.size()));
         result.patch(jump_index, static_cast<std::uint32_t>(result.size()));
@@ -171,9 +171,26 @@ void compiler_impl::accum(std::string_view token, op_code code, bool is_operator
         result.append(std::stod(std::string(token)));
         break;
     default:
-        if(!is_operator)
-            throw std::logic_error(token + " is currently not supported"s);
+        throw std::logic_error(token + " is currently not supported"s);
     }
+}
+
+
+void compiler_impl::accum_operand(std::string_view token) {
+    if(token == "null")
+        accum(token, op_code::null_lit);
+    else if(tokenizer::is_identifier(token[0]))
+        accum(token, op_code::local_var);    // TODO: global_var
+    else if(token[0] == '"' || token[0] == '\'') // TODO: char?
+        accum(token, op_code::str_lit);
+    else if(std::isdigit(token[0]) && (token.back() == 'u' || token.back() == 'U'))
+        accum(token, op_code::uint_lit);
+    else if(token.find_first_not_of("0123456789") == std::string_view::npos)
+        accum(token, op_code::int_lit);
+    else if(std::isdigit(token[0]))
+        accum(token, op_code::float_lit);
+    else
+        throw std::runtime_error("Invalid operand: "s + token);
 }
 
 
@@ -197,6 +214,62 @@ std::string compiler_impl::parse_str_literal(std::string_view str) {
 }
 
 
+void compiler_impl::pop_op_code(operation_type top) {
+    op_codes.pop();
+    if(top.operand_count != 0)
+        accum(top.symbol, top);
+
+    if(top.replace_with != op_code::none)
+        op_codes.push(top.replace_with);
+}
+
+
+void compiler_impl::handle_pair(operation_type op_type, operation_type top_op_type, std::size_t *index) {
+    op_code code = op_type.code;
+
+    if(code == op_code::comma) {
+        if(top_op_type.code == op_code::map_start)
+            code = op_code::map_add;
+        else if(top_op_type.code == op_code::array_start)
+            code = op_code::array_add;
+        else
+            throw std::runtime_error("Comma not within (), [] or {}");
+    } else {
+        if(top_op_type.primary_right_pair != code && top_op_type.other_right_pair != code)
+            throw std::runtime_error("Mismatched "s + top_op_type.symbol);
+        pop_op_code(top_op_type);
+        code = top_op_type.primary_right_pair;
+    }
+
+    accum(op_type.symbol, code);
+
+    if(code == op_code::map_add)
+        handle_map_label(index);
+}
+
+
+void compiler_impl::handle_map_label(std::size_t *index) {
+
+    std::string_view token = tokens[++*index];
+    operation_type op_type = lookup_operation(token, false);
+
+    if(op_type.code != op_code::none)
+        throw std::runtime_error("`"s + token + "` is not a valid map label");
+
+    if(token[0] == '"' || token[0] == '\'') {
+        accum(token, op_code::str_lit);
+    } else {
+        std::string t = "\""s + token + "\"";
+        accum({t.data(), t.size()}, op_code::str_lit);
+    }
+
+    token = tokens[++*index];
+    if(token != ":")
+        throw std::runtime_error("Expected colon after map label, not "s + token);
+
+    //op_codes.push(op_code::colon); 
+}
+
 
 std::uint8_t compiler_impl::local_var_index(std::string_view name) {
     std::size_t next_index = local_var_indexes.size() + 1;
@@ -204,207 +277,96 @@ std::uint8_t compiler_impl::local_var_index(std::string_view name) {
 }
 
 
-void compiler_impl::find_pair(operation_type current, op_code target, op_code target2) {
-    op_code top_code;
-
-    if(token_pairs.empty() || ((top_code = pop(token_pairs)) != target && top_code != target2))
-        throw std::runtime_error("find_pair: Mismatched "s + lookup_operation(target).symbol);
-
-    while((top_code = pop(op_codes)) != target && top_code != target2) {
-        accum(lookup_operation(top_code).symbol, top_code, true);
-    }
-
-    operation_type top_type = lookup_operation(top_code);
-    if(top_type.operand_count == 2)
-        accum(top_type.symbol, top_code, true);
-    else
-        accum(current.symbol, current.code, true);
-}
-
-
 std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_list) {
     reset();
 
-    op_code last_code = op_code::none;
-    bool in_binary_context = false;
-    std::string_view expect_token = "";
-
-    auto tokens = std::move(token_list);
+    tokens = std::move(token_list);
+    //tokens.insert(0, ";");
     if(tokens.back() != ";")
         tokens.push_back(";");
 
-    for(auto token : tokens) {
-        if(expect_token != "") {
-            if(expect_token == "{") {
-                if(token == "{") {
-                    op_codes.push(op_code::block_start);
-                    token_pairs.push(op_code::block_start);
-                    in_binary_context = false;
-                    continue;
-                }
-            } else if(token != expect_token) {
-                throw std::runtime_error("Expected `"s + expect_token + "` not " + token);
-            }
+    bool in_binary_context = false;
+    op_code last_code = op_code::semicolon;
 
-            expect_token = "";
-            if(token == ":")
+    for(std::size_t i = 0; i < tokens.size(); ++i) {
+        std::string_view token = tokens[i];
+        operation_type op_type = lookup_operation(token, in_binary_context);
+
+        if(op_type.code == op_code::colon) {
+            throw std::runtime_error("A colon was not expected here");
+        }
+
+        if(op_type.code == op_code::map_end && !op_codes.empty() && lookup_operation(op_codes.top()).category == op_category::ctrl_cond) {
+            op_type = lookup_operation(op_code::block_start);
+        }
+
+        if((op_type.category == op_category::ctrl_start || op_type.category == op_category::ctrl_cond) && (last_code != op_code::semicolon || last_code != op_code::block_end)) {
+            throw std::runtime_error(token + " should be at the start of a statement"s);
+        }
+
+        if(op_type.category == op_category::ctrl_start && tokens[i + 1] != "(") {
+            throw std::runtime_error("( should follow "s + token);
+        }
+      
+        if(op_type.code == op_code::semicolon) {
+            if(!op_codes.empty() && op_codes.top() != op_code::block_end)
+                throw std::runtime_error(token + " should be at the statement level"s);
+
+            if(last_code == op_code::semicolon)
                 continue;
         }
 
-        if((last_code == op_code::array_start && token == "]")
-                || (last_code == op_code::map_start && token == "}")) {
-//                || (last_code == op_code::func_call && token == ")")) {
-            op_codes.pop();
-            token_pairs.pop();
-            in_binary_context = !in_binary_context;
-            last_code = op_code::none;
-            continue;
-        }
-
-        operation_type op_type = lookup_operation(token, in_binary_context);
-
-        if(last_code == op_code::map_start || (last_code == op_code::comma && token_pairs.top() == op_code::map_start)) {
-            if(op_type.code != op_code::none || token.empty() || token == "null")
-                throw std::runtime_error("`"s + token + "` is not a valid map key.");
-
-            if(token[0] == '"' || token[0] == '\'') {
-                accum(token, op_code::str_lit, false);
-            } else {
-                std::string t = "\""s + token + "\"";
-                accum({t.data(), t.size()}, op_code::str_lit, false);
-            }
-
-            expect_token = ":";
-            last_code = op_type.code;
-            continue;
-        }
-
-        expect_token = "";
         last_code = op_type.code;
+        
+        in_binary_context = op_type.in_binary_context;
+        if(op_type.operand_count == 2 || op_type.code == op_code::semicolon)
+            in_binary_context = !in_binary_context;
 
         if(op_type.code == op_code::none && !token.empty()) {
             if(in_binary_context)
                 throw std::runtime_error("`"s + token + "` was not expected at this point.");
 
-            if(token == "null")
-                accum(token, op_code::null_lit, true);
-            else if(tokenizer::is_identifier(token[0]))
-                accum(token, op_code::local_var, false);    // TODO: global_var
-            else if(token[0] == '"' || token[0] == '\'') // TODO: char?
-                accum(token, op_code::str_lit, false);
-            else if(std::isdigit(token[0]) && (token.back() == 'u' || token.back() == 'U'))
-                accum(token, op_code::uint_lit, false);
-            else if(token.find_first_not_of("0123456789") == std::string_view::npos)
-                accum(token, op_code::int_lit, false);
-            else if(std::isdigit(token[0]))
-                accum(token, op_code::float_lit, false);
-            else
-                throw std::runtime_error("Invalid operand: "s + token);
-                
-            in_binary_context = !in_binary_context;
+            accum_operand(token);
             continue;
         }
 
-        if(op_type.operand_count == 2)
-            in_binary_context = !in_binary_context;
-
-        switch(op_type.code) {
-        case op_code::colon:
-            throw std::runtime_error("`:` was not expected here");
-        case op_code::while_cond:
-        case op_code::if_start:
-            if(!token_pairs.empty() && token_pairs.top() != op_code::block_start)
-                throw std::runtime_error(token + " is not expected here"s);
-            token_pairs.push(op_type.code);
-            in_binary_context = false;
-            expect_token = "(";
-            break;
-        case op_code::semicolon:
-            if(!token_pairs.empty() && (token_pairs.top() == op_code::if_block || token_pairs.top() == op_code::while_block)) {
-                op_code top = token_pairs.top();
-                find_pair(lookup_operation(top), top, op_code::none);
-                continue;
-            }
-            break;
-        case op_code::func_call:
-        case op_code::left_paren:
-        case op_code::index:
-        case op_code::array_start:
-        case op_code::map_start:
-            //if(op_type.code == op_code::array_start || op_type.code == op_code::map_start)
-            if(op_type.operand_count == 1)
-                accum(op_type.symbol, op_type.code, true);
-            token_pairs.push(op_type.code);
+        if(op_type.operand_count == 0) {
+            accum(token, op_type);
             op_codes.push(op_type.code);
+
+            if(op_type.code == op_code::map_start)
+                handle_map_label(&i);
             continue;
-        case op_code::right_paren:
-            find_pair(op_type, op_code::func_call, op_code::left_paren);
-            if(!token_pairs.empty() && (token_pairs.top() == op_code::if_start || token_pairs.top() == op_code::while_cond)) {
-                op_code current_code = (token_pairs.top() == op_code::if_start ? op_code::if_start : op_code::while_start);
-                accum(lookup_operation(current_code).symbol, current_code, false);
-                op_code new_code = (token_pairs.top() == op_code::if_start ? op_code::if_block : op_code::while_block);
-                token_pairs.top() = new_code;
-                op_codes.push(new_code);
-                expect_token = "{";
-                in_binary_context = false;
-            }
-            continue;
-        case op_code::array_end:
-            find_pair(op_type, op_code::index, op_code::array_start);
-            continue;
-        case op_code::map_end:
-            find_pair(op_type, op_code::map_start, op_code::block_start);
-            if(!token_pairs.empty() && (token_pairs.top() == op_code::if_block || token_pairs.top() == op_code::while_block)) { 
-                op_code top = token_pairs.top();
-                accum(lookup_operation(top).symbol, top, true);
-                token_pairs.pop();
-                if(pop(op_codes) != top)      // TODO: remove?
-                    throw std::logic_error("expected while/if_block");
-            }
-            continue;
-        default: 
-            break;
         }
         
         op_code top_code;
 
         while(!op_codes.empty() && has_lower_precedence(op_type.code, top_code = op_codes.top())) {
-            switch(top_code) {
-            case op_code::func_call:    // TODO: remove?
-            case op_code::left_paren:
-            case op_code::index:
-            case op_code::array_start:
-            case op_code::map_start:
-                throw std::logic_error("Unexpected symbol: "s + lookup_operation(top_code).symbol);
-            default:
-                accum(lookup_operation(top_code).symbol, top_code, true);
+            operation_type top_op_type = lookup_operation(top_code);
+            
+            if(op_type.has_left_pair && top_op_type.primary_right_pair != op_code::none) {
+                handle_pair(op_type, top_op_type, &i);
+                goto done;
             }
-            op_codes.pop();
+
+            accum(top_op_type.symbol, top_op_type);
+            pop_op_code(top_op_type);
         }
 
-        if(op_type.code == op_code::if_start || op_type.code == op_code::while_start) {
-            /* do nothing */
-        } else if(op_type.code == op_code::while_cond) {
-            accum("while", op_code::while_cond, false);
-        } else if(op_type.code == op_code::comma) {
-            if(token_pairs.empty())
-                throw std::runtime_error("Comma not within (), [] or {}");
-
-            op_code code = op_code::comma;
-
-            if(token_pairs.top() == op_code::array_start)
-                code = op_code::array_add;
-            else if(token_pairs.top() == op_code::map_start)
-                code = op_code::map_add;
-
-            accum(",", code, true);
-            //op_codes.push(op_code::array_add);
-        } else {    
+        if(op_type.has_left_pair)
+            throw std::runtime_error("Mismatched "s + token);
+        
+        if(op_type.operand_count == 1 && op_type.associativity == associative::left)
+            accum(op_type.symbol, op_type);
+        else
             op_codes.push(op_type.code);
-        }
+
+        if(op_type.category == op_category::ctrl_start && tokens[i + 1] != "(")
+            throw std::runtime_error("Expected ( to follow "s + token);
+done:   
+        ;
     }
 
-    /*
     if constexpr(debug) {
         if(op_codes.size() != 1 || op_codes.top() != op_code::semicolon) {
             throw std::logic_error("Expected stack to only contain op_code::semicolon. Size: " 
@@ -412,12 +374,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
                     + std::to_string(op_codes.empty() ? 0 : static_cast<int>(op_codes.top())));
         }
     }
-    */
 
-    if(!token_pairs.empty()) {
-        throw std::runtime_error("Mismatched "s + lookup_operation(pop(token_pairs)).symbol);
-    }
-    
     std::size_t local_var_count = local_var_indexes.size();
     //local_var_indexes.clear();
 

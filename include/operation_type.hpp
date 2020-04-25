@@ -10,7 +10,8 @@ enum class op_category : std::uint8_t {
     comparison,
     arithmetic,
     assignment,
-    control,
+    ctrl_start,
+    ctrl_cond,
     other
 };
 
@@ -116,11 +117,13 @@ struct operation_type {
     int operand_count;
     associative associativity;
     int precedence;
+    bool is_nop;
     op_category category;
     op_code code;
     op_code replace_with;
     bool has_left_pair;
-    op_code right_pair;
+    op_code primary_right_pair;
+    op_code other_right_pair;
 };
 
 

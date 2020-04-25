@@ -104,13 +104,14 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         case op_code::right_paren:
         case op_code::colon:
         case op_code::block_end:
-        case op_code::while_cond:
-            break;
-        case op_code::while_block:
+        case op_code::while_start:
+        case op_code::if_start:
+            throw std::logic_error("Unexpected "s + lookup_operation(code).symbol + " in program");
+        case op_code::while_end:
             pop(operands);
             buffer.seek_abs(*buffer.read<std::uint32_t>());
             break;
-        case op_code::if_block:
+        case op_code::if_end:
             pop(operands);
             break;
         case op_code::global_var:
@@ -147,8 +148,8 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         case op_code::map_end:
             map_add(operands);
             break;
-        case op_code::if_start:
-        case op_code::while_start:
+        case op_code::if_cond:
+        case op_code::while_cond:
             execute_control_statement(buffer, operands, code);
             break;
         default:
