@@ -19,7 +19,13 @@ using namespace std::string_literals;
 namespace executor {
 
 
-void unary_op(std::stack<object> &operands, op_code code) {
+void unary_op(object &last_value, std::stack<object> &operands, op_code code) {
+    if(code == op_code::semicolon) {
+        if(!operands.empty())
+            last_value = pop(operands);
+        return;
+    }
+
     if constexpr(debug) {
         if(operands.empty()) {
             throw std::logic_error("execute_unary_op with zero operands. op_code: "s
@@ -28,7 +34,7 @@ void unary_op(std::stack<object> &operands, op_code code) {
     }
 
     object operand = pop(operands);
-
+    
     if(code == op_code::logic_not) {
         operands.push(object(static_cast<std::int64_t>(!operand.to_bool())));
         return;

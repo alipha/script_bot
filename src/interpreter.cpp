@@ -34,6 +34,7 @@ private:
     void execute_unary_op(std::stack<object> &operands, op_code code);
 
     memory *mem;
+    object last_value;
 };
 
 
@@ -93,26 +94,22 @@ void execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> 
 std::string interpreter_impl::execute(const std::vector<char> &program) {
     memory_buffer<debug> buffer(program);
     std::stack<object> operands;
+    last_value = object::type(std::monostate());
 
     mem->push_frame(*buffer.read<std::uint8_t>());
 
     while(buffer.position() < buffer.size()) {
         op_code code = *buffer.read<op_code>();
-       
-        switch(code) {
-        case op_code::left_paren:
-        case op_code::right_paren:
-        case op_code::colon:
-        case op_code::block_end:
-        case op_code::while_start:
-        case op_code::if_start:
-            throw std::logic_error("Unexpected "s + lookup_operation(code).symbol + " in program");
+      
+        switch(code) { 
         case op_code::while_end:
-            pop(operands);
+            if(!operands.empty())
+                operands.pop();
             buffer.seek_abs(*buffer.read<std::uint32_t>());
             break;
         case op_code::if_end:
-            pop(operands);
+            if(!operands.empty())
+                operands.pop();
             break;
         case op_code::global_var:
             throw std::logic_error("global_var is currently unsupported");
@@ -153,30 +150,34 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
             execute_control_statement(buffer, operands, code);
             break;
         default:
+            if constexpr(debug) {
+                if(lookup_operation(code).is_nop)
+                    throw std::logic_error("Unexpected "s + lookup_operation(code).symbol + " in program");
+            }
+
             if(is_binary_op(code)) {
                 execute_binary_op(operands, code);
             } else {
-                executor::unary_op(operands, code);
+                executor::unary_op(last_value, operands, code);
             }
         }
     }
 
     if constexpr(debug) {
-        if(operands.size() != 1) {
-            throw std::logic_error("Expected one operand in stack. size: " + std::to_string(operands.size()));
+        if(!operands.empty()) {
+            throw std::logic_error("Expected no operands in stack. size: " + std::to_string(operands.size()));
         }
     }
     
-    std::string result = operands.top().to_string();
     mem->pop_frame();
-    return result;
+    return last_value.to_string();
 }
 
 
 void interpreter_impl::array_add(std::stack<object> &operands) {
     if constexpr(debug) {
         if(operands.size() < 2)
-            throw std::logic_error("execute array_add with " + std::to_string(operands.size()) + "operands");
+            throw std::logic_error("execute array_add with " + std::to_string(operands.size()) + " operands");
     }
 
     object element = pop(operands);
@@ -187,7 +188,7 @@ void interpreter_impl::array_add(std::stack<object> &operands) {
 void interpreter_impl::map_add(std::stack<object> &operands) {
     if constexpr(debug) {
         if(operands.size() < 3)
-            throw std::logic_error("execute map_add with " + std::to_string(operands.size()) + "operands");
+            throw std::logic_error("execute map_add with " + std::to_string(operands.size()) + " operands");
     }
 
     object value = pop(operands);
@@ -209,11 +210,11 @@ void interpreter_impl::execute_binary_op(std::stack<object> &operands, op_code c
     object left = is_assign ? operands.top() : pop(operands);
     object result;
 
-    if(is_assign) {
+    if(is_assign && code != op_code::assign) {
         code = static_cast<op_code>(static_cast<int>(code) - assign_ops_offset);
     }
 
-    if(code == op_code::semicolon)
+    if(code == op_code::assign)
         result = right;
     else if(code == op_code::index)
         result = executor::index_op(mem, left, right);
@@ -227,12 +228,13 @@ void interpreter_impl::execute_binary_op(std::stack<object> &operands, op_code c
         throw std::logic_error("currently unspported binary op: "s + lookup_operation(code).symbol);
 
     if(is_assign) {
-        if(var_ref *var = std::get_if<var_ref>(&left.get()))
+        if(var_ref *var = std::get_if<var_ref>(&left.get())) {
             **var = to_variant<object::type>(result.value());
-        else if(lvalue_ref *lvalue = std::get_if<lvalue_ref>(&left.get()))
+        } else if(lvalue_ref *lvalue = std::get_if<lvalue_ref>(&left.get())) {
             **lvalue = to_variant<object::type>(result.value()); 
-        else
+        } else {
             throw std::runtime_error("left of "s + lookup_operation(code).symbol + " is not assignable");
+        }
     } else {
         operands.push(result);
     }

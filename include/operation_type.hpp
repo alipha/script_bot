@@ -12,6 +12,7 @@ enum class op_category : std::uint8_t {
     assignment,
     ctrl_start,
     ctrl_cond,
+    ctrl_end,
     other
 };
 
@@ -19,74 +20,86 @@ enum class op_category : std::uint8_t {
 enum class op_code : std::uint8_t {
     none = 0,
     dot,
-    func_call,
+    null_dot,
+    null_dot_end,
+    func_call, // 04
     index,
-    lt,        // 04
+    null_index,
+    null_index_end,
+    lt,        // 08
     lte,
     gt,
     gte,
-    eq,        // 08
+    eq,        // 0c
     neq,
     mod,
     bit_and,
-    bit_xor,   // 0c
+    bit_xor,   // 10
     bit_or,
     shl,
     shr,
-    pow,       // 10
+    pow,       // 14
     add,
     sub,
     mul,
-    div,       // 14
+    div,       // 18
     assign,
     mod_assign,
     and_assign,
-    xor_assign, // 18
+    xor_assign, // 1c
     or_assign,  
     shl_assign,
     shr_assign,
-    pow_assign, // 1c
+    pow_assign, // 20
     add_assign,
     sub_assign,
     mul_assign,
-    div_assign, // 20
+    div_assign, // 24
     pre_inc,
     pre_dec,
     post_inc,
-    post_dec,   // 24
+    post_dec,   // 28
     bit_not,
     logic_not,
     plus,
-    negate,     // 28
+    negate,     // 2c
     logic_and,
     logic_and_end,
     logic_or,
-    logic_or_end, // 2c
+    logic_or_end, // 30
+    coalesce,
+    coalesce_end,
     array_add,
-    map_add,
+    map_add,     // 34
+    param_add,
     comma,
-    colon,       // 30
+    ternary_start,
+    colon,       // 38
+    ternary_end,
     semicolon,
     left_paren,
+    func_call_end, // 3c
     right_paren,
-    array_start, // 34
-    array_end,
+    array_start,
+    index_end,
+    array_end,   // 40
     block_start,
     map_start,
-    block_end,   // 38
-    map_end,
+    block_end,
+    map_end,     // 44
     if_start,
     if_cond,
-    if_end,      // 3c
+    if_end,
+    else_start,  // 48
     while_start,
     while_cond,
     while_end,
-    count,       // 40
+    count,       // 4c
 
     global_var,
     local_var,
     int_lit,
-    uint_lit,   // 44
+    uint_lit,    // 50
     float_lit,
     str_lit,
     null_lit
@@ -138,11 +151,11 @@ inline bool is_binary_op(op_code code) {
 }
 
 inline bool is_unary_op(op_code code) {
-    return code >= op_code::pre_inc && code <= op_code::while_cond;
+    return code >= op_code::pre_inc && code <= op_code::while_end;
 }
 
 inline bool is_binary_comp(op_code code) {
-    return code >= op_code::lt && code <= op_code::logic_or;
+    return code >= op_code::lt && code <= op_code::neq;
 }
 
 inline bool is_binary_int_op(op_code code) {

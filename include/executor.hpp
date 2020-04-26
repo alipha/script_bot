@@ -18,7 +18,7 @@ object binary_arithmetic(op_code code, const object &left, const object &right);
 
 object index_op(memory *mem, const object &left, const object &right);
 
-void unary_op(std::stack<object> &operands, op_code code);
+void unary_op(object &last_value, std::stack<object> &operands, op_code code);
 
 }
 

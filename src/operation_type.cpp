@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -15,14 +16,16 @@ using namespace std::string_literals;
 
 operation_type operation_types[] = {
 //  symbol  bin?  ops    associativity   prec  nop?       category                code                  replace_with    left_pair?     primary_right         other_right
-    {"",    true,  0, associative::left,    0, true,  op_category::other,      op_code::none,         op_code::none,         false, op_code::none,         op_code::none},
+    {"",    true,  0, associative::left,    0, false, op_category::other,      op_code::none,         op_code::none,         false, op_code::none,         op_code::none},
     {".",   true,  2, associative::left,  900, false, op_category::other,      op_code::dot,          op_code::none,         false, op_code::none,         op_code::none},
     {"?.",  true,  2, associative::left,  900, false, op_category::other,      op_code::null_dot,     op_code::null_dot_end, false, op_code::none,         op_code::none},
-    {"/?.", true,  2, associative::left,  900, true,  op_category::other,      op_code::null_dot_end, op_code::none,         false, op_code::none,         op_code::none},
+    {"/?.", true,  2, associative::left,  850, true,  op_category::other,      op_code::null_dot_end, op_code::none,         false, op_code::none,         op_code::none},
     {"(",   true,  2, associative::left,  900, false, op_category::other,      op_code::func_call,    op_code::none,         false, op_code::func_call_end,op_code::right_paren},
-    {"[",   true,  2, associative::left,  900, false, op_category::other,      op_code::index,        op_code::none,         false, op_code::array_index,  op_code::array_end},
-    {"?[",  true,  2, associative::left,  900, false, op_category::other,      op_code::null_index,   op_code::null_index_end,false,op_code::null_index_end,op_code::array_end},
-    {"/?[", true,  2, associative::left,  100, true,  op_category::other,      op_code::null_index_end,op_code::none,        false, op_code::none,         op_code::none},
+  //{"?(",  true,  2, associative::left,  900, false, op_category::other,      op_code::null_call,    op_code::none,         false, op_code::null_call_end,op_code::right_paren},
+  //{"/?(", true,  2, associative::left,  850, true,  op_category::other,      op_code::null_call_end,op_code::none,         true,  op_code::none,         op_code::none},
+    {"[",   true,  2, associative::left,  900, false, op_category::other,      op_code::index,        op_code::none,         false, op_code::index_end,    op_code::array_end},
+    {"?[",  true,  2, associative::left,  900, false, op_category::other,      op_code::null_index,   op_code::null_index_end,false,op_code::index_end,    op_code::array_end},
+    {"/?[", true,  2, associative::left,  850, true,  op_category::other,      op_code::null_index_end,op_code::none,        false, op_code::none,         op_code::none},
     {"<",   true,  2, associative::left,  450, false, op_category::comparison, op_code::lt,           op_code::none,         false, op_code::none,         op_code::none},
     {"<=",  true,  2, associative::left,  450, false, op_category::comparison, op_code::lte,          op_code::none,         false, op_code::none,         op_code::none},
     {">",   true,  2, associative::left,  450, false, op_category::comparison, op_code::gt,           op_code::none,         false, op_code::none,         op_code::none},
@@ -64,44 +67,45 @@ operation_type operation_types[] = {
     {"/&&", true,  1, associative::left,  300, true,  op_category::comparison, op_code::logic_and_end,op_code::none,         false, op_code::none,         op_code::none},
     {"||",  true,  1, associative::left,  275, false, op_category::comparison, op_code::logic_or,     op_code::logic_or_end, false, op_code::none,         op_code::none},
     {"/||", true,  1, associative::left,  275, true,  op_category::comparison, op_code::logic_or_end, op_code::none,         false, op_code::none,         op_code::none},
-    {"??",  true,  1, associative::left,  270, false, op_category::comparison, op_code::coalesce,     op_code::coalesc_end,  false, op_code::none,         op_code::none},
+    {"??",  true,  1, associative::left,  270, false, op_category::comparison, op_code::coalesce,     op_code::coalesce_end, false, op_code::none,         op_code::none},
     {"/??", true,  1, associative::left,  270, true,  op_category::comparison, op_code::coalesce_end, op_code::none,         false, op_code::none,         op_code::none},
-    {",",   true,  1, associative::left,  150, false, op_category::other,      op_code::array_add,    op_code::none,         true,  op_code::none,         op_code::none},
-    {",",   true,  1, associative::left,  150, false, op_category::other,      op_code::map_add,      op_code::none,         true,  op_code::none,         op_code::none},
-    {",",   true,  1, associative::left,  150, false, op_category::other,      op_code::comma,        op_code::none,         true,  op_code::none,         op_code::none},
-    {"?",   true,  1, associative::left,  170, false, op_category::other,      op_code::ternary_start,op_code::ternary_cond, false, op_code::none,         op_code::none},
-    {":",   true,  1, associative::left,  170, true,  op_category::other,      op_code::colon,        op_code::none,         false, op_code::none,         op_code::none},    // TODO: next: ternary_end?
+    {",",   true,  1, associative::left,  150, false, op_category::other,      op_code::array_add,    op_code::none,         false, op_code::none,         op_code::none},
+    {",",   true,  1, associative::left,  150, false, op_category::other,      op_code::map_add,      op_code::none,         false, op_code::none,         op_code::none},
+    {",",   true,  1, associative::left,  150, false, op_category::other,      op_code::param_add,    op_code::none,         false, op_code::none,         op_code::none},
+    {",",   true,  2, associative::left,  150, false, op_category::other,      op_code::comma,        op_code::none,         false, op_code::none,         op_code::none},
+    {"?",   true,  1, associative::left,  170, false, op_category::other,      op_code::ternary_start,op_code::colon,        false, op_code::none,         op_code::none},
+    {":",   true,  1, associative::left,  170, false, op_category::other,      op_code::colon,        op_code::none,         false, op_code::none,         op_code::none},    // TODO: next: ternary_end?
     {"/?:", true,  1, associative::left,  170, true,  op_category::other,      op_code::ternary_end,  op_code::none,         false, op_code::none,         op_code::none},
-    {";",   true,  1, associative::left,   10, false, op_category::other,      op_code::semicolon,    op_code::none,         false, op_code::none,         op_code::none},  // TODO: this precedence should be different?
-    {"(",   false, 0, associative::right, 100, true,  op_category::other,      op_code::left_paren,   op_code::none,         false, op_code::right_paren,  op_code::func_call_end},
-    {")",   true,  1, associative::left,  100, false, op_category::other,      op_code::func_call_end,op_code::none,         true,  op_code::none,         op_code::none},
-    {")",   true,  1, associative::left,  100, true,  op_category::other,      op_code::right_paren,  op_code::none,         true,  op_code::none,         op_code::none},
-    {"[",   false, 0, associative::right, 100, false, op_category::other,      op_code::array_start,  op_code::none,         false, op_code::array_end,    op_code::index_end},
-    {"]",   true,  1, associative::left,  100, false, op_category::other,      op_code::index_end,    op_code::none,         true,  op_code::none,         op_code::none},
-    {"]",   true,  1, associative::left,  100, false, op_category::other,      op_code::array_end,    op_code::none,         true,  op_code::none,         op_code::none},
-    {"{",   false, 0, associative::right, 100, true,  op_category::other,      op_code::block_start,  op_code::none,         false, op_code::block_end,    op_code::map_end},
-    {"{",   false, 0, associative::right, 100, false, op_category::other,      op_code::map_start,    op_code::none,         false, op_code::map_end,      op_code::block_end},
-    {"}",   false, 1, associative::left,  100, true,  op_category::other,      op_code::block_end,    op_code::none,         true,  op_code::none,         op_code::none},
-    {"}",   true,  1, associative::left,  100, false, op_category::other,      op_code::map_end,      op_code::none,         true,  op_code::none,         op_code::none},
-    {"if" , false, 1, associative::left,    5, true,  op_category::ctrl_start, op_code::if_start,     op_code::if_cond,      false, op_code::none,         op_code::none},
-    {"if?", false, 1, associative::left,    5, false, op_category::ctrl_cond,  op_code::if_cond,      op_code::if_end,       false, op_code::none,         op_code::none},
-    {"/if", false, 1, associative::left,    5, true,  op_category::other,      op_code::if_end,       op_code::none,         false, op_code::none,         op_code::none}, 
-    {"else",false, 1, associative::left,    6, false, op_category::ctrl_cond,  op_code::else_start,   op_code::if_end,       false, op_code::none,         op_code::none},
-    {"while",false,1, associative::left,    5, true,  op_category::ctrl_start, op_code::while_start,  op_code::while_cond,   false, op_code::none,         op_code::none},
-    {"while?",false,1,associative::left,    5, false, op_category::ctrl_cond,  op_code::while_cond,   op_code::while_end,    false, op_code::none,         op_code::none},
-    {"/while",false,1,associative::left,    5, false, op_category::other,      op_code::while_end,    op_code::none,         false, op_code::none,         op_code::none}
+    {";",   true,  1, associative::left,   50, false, op_category::other,      op_code::semicolon,    op_code::none,         false, op_code::none,         op_code::none},  // TODO: this precedence should be different?
+    {"(",   false, 0, associative::right,   0, true,  op_category::other,      op_code::left_paren,   op_code::none,         false, op_code::right_paren,  op_code::func_call_end},
+    {")",   true,  1, associative::left,  900, false, op_category::other,      op_code::func_call_end,op_code::none,         true,  op_code::none,         op_code::none},
+    {")",   true,  1, associative::left,    0, true,  op_category::other,      op_code::right_paren,  op_code::none,         true,  op_code::none,         op_code::none},
+    {"[",   false, 0, associative::right,   0, false, op_category::other,      op_code::array_start,  op_code::none,         false, op_code::array_end,    op_code::index_end},
+    {"]",   true,  1, associative::left,  900, true,  op_category::other,      op_code::index_end,    op_code::none,         true,  op_code::none,         op_code::none},
+    {"]",   true,  1, associative::left,    0, false, op_category::other,      op_code::array_end,    op_code::none,         true,  op_code::none,         op_code::none},
+    {"{",   false, 0, associative::right,   0, true,  op_category::other,      op_code::block_start,  op_code::none,         false, op_code::block_end,    op_code::map_end},
+    {"{",   false, 0, associative::right,   0, false, op_category::other,      op_code::map_start,    op_code::none,         false, op_code::map_end,      op_code::block_end},
+    {"}",   false, 1, associative::left,    0, true,  op_category::other,      op_code::block_end,    op_code::none,         true,  op_code::none,         op_code::none},
+    {"}",   true,  1, associative::left,    0, false, op_category::other,      op_code::map_end,      op_code::none,         true,  op_code::none,         op_code::none},
+    {"if" , false, 1, associative::left,   50, true,  op_category::ctrl_start, op_code::if_start,     op_code::if_cond,      false, op_code::none,         op_code::none},
+    {"if?", false, 1, associative::left,   50, false, op_category::ctrl_cond,  op_code::if_cond,      op_code::if_end,       false, op_code::none,         op_code::none},
+    {"/if", false, 1, associative::right,  50, true,  op_category::ctrl_end,   op_code::if_end,       op_code::none,         false, op_code::none,         op_code::none}, 
+    {"else",false, 1, associative::left,   50, false, op_category::ctrl_cond,  op_code::else_start,   op_code::if_end,       false, op_code::none,         op_code::none},
+    {"while",false,1, associative::left,   50, true,  op_category::ctrl_start, op_code::while_start,  op_code::while_cond,   false, op_code::none,         op_code::none},
+    {"while?",false,1,associative::left,   50, false, op_category::ctrl_cond,  op_code::while_cond,   op_code::while_end,    false, op_code::none,         op_code::none},
+    {"/while",false,1,associative::right,  50, false, op_category::ctrl_end,   op_code::while_end,    op_code::none,         false, op_code::none,         op_code::none}
 };
 
 
-void validate(const operation_type &type) {
+void validate(const operation_type &type, const std::set<op_code> &primary_right_pairs) {
     op_code code = type.code;
-    if(type.operand_count == 2 && !is_binary_op(code))
+    if(type.operand_count == 2 && !is_binary_op(code) && code != op_code::comma)
         throw std::logic_error(type.symbol + " has 2 operands but !is_binary_op"s);
     if(type.operand_count != 2 && is_binary_op(code)) 
         throw std::logic_error(type.symbol + " doesn't have 2 operands but is_binary_op"s);
     if(type.operand_count == 1 && !is_unary_op(code))
         throw std::logic_error(type.symbol + " has 1 operand but !is_unary_op"s);
-    if(type.operand_count != 1 && is_unary_op(code))
+    if(type.operand_count == 2 && is_unary_op(code) && code != op_code::comma)
         throw std::logic_error(type.symbol + " doesn't have 1 operand but is_unary_op"s);
     if(type.operand_count == 2 && type.category == op_category::comparison && !is_binary_comp(code))
         throw std::logic_error(type.symbol + " is binary and is comparison category but !is_binary_comp"s);
@@ -122,7 +126,28 @@ void validate(const operation_type &type) {
     if(type.operand_count == 1 && type.category == op_category::assignment && !is_increment(code))
         throw std::logic_error(type.symbol + " is unary and is assignment category but !is_increment"s); 
     if((type.operand_count != 1 || type.category != op_category::assignment) && is_increment(code))
-        throw std::logic_error(type.symbol + " is not unary or is not assignment category but is_increment"s);  
+        throw std::logic_error(type.symbol + " is not unary or is not assignment category but is_increment"s);
+
+    operation_type primary_right = operation_types[static_cast<int>(type.primary_right_pair)];
+    operation_type other_right = operation_types[static_cast<int>(type.other_right_pair)];
+
+    if(type.primary_right_pair != op_code::none && type.primary_right_pair == type.other_right_pair)
+        throw std::logic_error(type.symbol + " has the same primary and other right pairs"s);
+    if(type.primary_right_pair == op_code::none && type.other_right_pair != op_code::none)
+        throw std::logic_error(type.symbol + " has other right pair "s + other_right.symbol + " but no primary right pair");
+    if(type.primary_right_pair != op_code::none && !primary_right.has_left_pair)
+        throw std::logic_error(type.symbol + " has a right pair of "s + primary_right.symbol + " but that right pair's has_left_pair is false");
+    if(type.other_right_pair != op_code::none && !other_right.has_left_pair)
+        throw std::logic_error(type.symbol + " has an other right pair of "s + other_right.symbol + " but that right pair's has_left_pair is false");
+    if(type.primary_right_pair != op_code::none && type.other_right_pair != op_code::none 
+            && primary_right.symbol != other_right.symbol)
+        throw std::logic_error(type.symbol + " has right pairs "s + primary_right.symbol + " and " + other_right.symbol + " with different symbols");
+    if(type.primary_right_pair != op_code::none && type.precedence != primary_right.precedence)
+        throw std::logic_error(type.symbol + " and "s + primary_right.symbol + " have different precedences");
+    if(type.has_left_pair && primary_right_pairs.find(type.code) == primary_right_pairs.end())
+        throw std::logic_error(type.symbol + " has_left_pair, but no symbols has it as a right_pair"s);
+    if(!type.has_left_pair && primary_right_pairs.find(type.code) != primary_right_pairs.end())
+        throw std::logic_error(type.symbol + " does not has_left_pair, but a symbol has it as a right_pair"s);
 }
 
 
@@ -132,13 +157,19 @@ std::map<std::pair<std::string_view, bool>, operation_type> load_operation_types
     static_assert(sizeof(types) / sizeof(*types) == static_cast<std::size_t>(op_code::count), 
             "Missing op_code to operation_type mapping");
 
+    std::set<op_code> primary_right_pairs;
     std::map<std::pair<std::string_view, bool>, operation_type> type_map;
     int code_index = 0;
 
     for(auto &t : types) {
         if(t.code != static_cast<op_code>(code_index))
             throw std::logic_error(t.symbol + " is not in the correct order in operation_types. Index: "s + std::to_string(code_index));
-        validate(t);
+        
+        if(t.primary_right_pair != op_code::none) {
+            auto[it, success] = primary_right_pairs.insert(t.primary_right_pair);
+            if(!success && t.code != op_code::null_index)
+                throw std::logic_error(std::to_string(static_cast<int>(t.primary_right_pair)) + " is aleady a primary right pair"s);
+        }
 
         if(t.category == op_category::assignment && t.operand_count == 2 && t.code != op_code::assign) {
             std::string_view symbol = t.symbol;
@@ -150,6 +181,10 @@ std::map<std::pair<std::string_view, bool>, operation_type> load_operation_types
 
         type_map[std::pair(t.symbol, t.in_binary_context)] = t;
         code_index++;
+    }
+
+    for(auto &t : types) {
+        validate(t, primary_right_pairs);
     }
 
     return type_map;
@@ -194,7 +229,7 @@ bool has_lower_precedence(op_code current_code, op_code top_code) {
 
     if(current.has_left_pair)
         return true;
-    if(top.right_pair != op_code::none)
+    if(top.primary_right_pair != op_code::none)
         return false;
     
     return current.precedence < top.precedence 
