@@ -102,15 +102,16 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         op_code code = *buffer.read<op_code>();
       
         switch(code) { 
+        case op_code::else_start:
         case op_code::while_end:
             if(!operands.empty())
                 operands.pop();
             buffer.seek_abs(*buffer.read<std::uint32_t>());
             break;
-        case op_code::if_end:
+        /*case op_code::if_end:
             if(!operands.empty())
                 operands.pop();
-            break;
+            break;*/
         case op_code::global_var:
             throw std::logic_error("global_var is currently unsupported");
         case op_code::local_var:

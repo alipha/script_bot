@@ -20,8 +20,6 @@ namespace executor {
 
 template<typename T, typename U>
 bool do_binary_comp(op_code code, const std::optional<T> &l, const std::optional<U> &r) {
-    if constexpr(std::is_same_v<T, std::int64_t> && std::is_same_v<U, std::int64_t>)
-        debug_out(std::to_string(*l) + " " + lookup_operation(code).symbol + " " + std::to_string(*r));
     switch(code) {
     case op_code::lt:  return l < r;
     case op_code::lte: return l <= r;

@@ -142,23 +142,36 @@ void compiler_impl::accum(std::string_view token, const operation_type &op_type,
     case op_code::while_start:
         while_indexes.push(result.size());
         break;
+    case op_code::else_start: {
+        debug_out("else_start accum " + std::to_string(jump_indexes.size()));
+        std::size_t jump_index = pop(jump_indexes);
+        jump_indexes.push(result.append(static_cast<std::uint32_t>(0)));
+        //debug_out("Else Patching: " + std::to_string(jump_index) + " with " + std::to_string(result.size()));
+        result.patch(jump_index, static_cast<std::uint32_t>(result.size()));
+        break;
+    }
     case op_code::while_cond:
     case op_code::if_cond:
+    case op_code::logic_and:
+    case op_code::logic_or:
         jump_indexes.push(result.append(static_cast<std::uint32_t>(0)));
         break;
     case op_code::while_end: {
         std::size_t jump_index = pop(while_indexes);
-        //debug_out("And appending: " + std::to_string(jump_index));
+        //debug_out("While Appending: " + std::to_string(jump_index));
         result.append(static_cast<std::uint32_t>(jump_index));
 
         jump_index = pop(jump_indexes);
-        //debug_out("Patching: " + std::to_string(jump_index) + " with " + std::to_string(result.size()));
+        //debug_out("While Patching: " + std::to_string(jump_index) + " with " + std::to_string(result.size()));
         result.patch(jump_index, static_cast<std::uint32_t>(result.size()));
         break;
     }
-    case op_code::if_end: {
+    case op_code::if_end:
+    case op_code::else_end:
+    case op_code::logic_and_end:
+    case op_code::logic_or_end: {
         std::size_t jump_index = pop(jump_indexes);
-        //debug_out("Patching: " + std::to_string(jump_index) + " with " + std::to_string(result.size()));
+        //debug_out("If Patching: " + std::to_string(jump_index) + " with " + std::to_string(result.size()));
         result.patch(jump_index, static_cast<std::uint32_t>(result.size()));
         break;
     }
@@ -317,9 +330,10 @@ void compiler_impl::handle_ctrl_end(mut<operation_type> op_type_ref, mut<bool> i
         in_binary = false;
 
         if(top_op_type.code == op_code::if_end && tokens[i + 1] == "else") {
+            op_codes.top() = op_code::else_end;
             op_type = lookup_operation(tokens[++i], false);
             accum(op_type.symbol, op_type);
-            break;
+            return;
         }
 
         pop_op_code(top_op_type);
@@ -387,11 +401,11 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             op_type = lookup_operation(token, in_binary_context);
         }
 
-        if(op_type.code == op_code::colon) {
-            throw std::runtime_error("A colon was not expected here");
+        if(op_type.code == op_code::colon || op_type.code == op_code::else_start) {
+            throw std::runtime_error("`"s + token + "` was not expected here");
         }
 
-        debug_out("last_type: "s + last_type.symbol);
+        //debug_out("last_type: "s + last_type.symbol);
 
         if(op_type.code == op_code::map_start && last_type.category == op_category::ctrl_cond) {
             op_type = lookup_operation(op_code::block_start);
@@ -451,7 +465,8 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             if(op_type.code == op_code::semicolon) {
                 handle_ctrl_end(mut(op_type), mut(in_binary_context), mut(i));
 
-                if(!op_codes.empty() && op_codes.top() != op_code::block_start && op_codes.top() != op_code::if_end)
+                if(!op_codes.empty() && op_codes.top() != op_code::block_start 
+                        && lookup_operation(op_codes.top()).category != op_category::ctrl_end)
                     throw std::runtime_error(token + " should be at the statement level"s);
                 //if(last_code == op_code::semicolon)
                     //continue;

@@ -91,18 +91,19 @@ enum class op_code : std::uint8_t {
     if_cond,
     if_end,
     else_start,  // 48
+    else_end,
     while_start,
     while_cond,
-    while_end,
-    count,       // 4c
+    while_end,   // 4c
+    count,
 
     global_var,
     local_var,
-    int_lit,
-    uint_lit,    // 50
+    int_lit,     // 50
+    uint_lit,
     float_lit,
     str_lit,
-    null_lit
+    null_lit     // 54
 };
 
 

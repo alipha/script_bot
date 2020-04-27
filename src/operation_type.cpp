@@ -90,7 +90,8 @@ operation_type operation_types[] = {
     {"if" , false, 1, associative::left,   50, true,  op_category::ctrl_start, op_code::if_start,     op_code::if_cond,      false, op_code::none,         op_code::none},
     {"if?", false, 1, associative::left,   50, false, op_category::ctrl_cond,  op_code::if_cond,      op_code::if_end,       false, op_code::none,         op_code::none},
     {"/if", false, 1, associative::right,  50, true,  op_category::ctrl_end,   op_code::if_end,       op_code::none,         false, op_code::none,         op_code::none}, 
-    {"else",false, 1, associative::left,   50, false, op_category::ctrl_cond,  op_code::else_start,   op_code::if_end,       false, op_code::none,         op_code::none},
+    {"else",false, 1, associative::left,   50, false, op_category::ctrl_cond,  op_code::else_start,   op_code::none,         false, op_code::none,         op_code::none},
+    {"/else",false,1, associative::right,  50, true,  op_category::ctrl_end,   op_code::else_end,     op_code::none,         false, op_code::none,         op_code::none}, 
     {"while",false,1, associative::left,   50, true,  op_category::ctrl_start, op_code::while_start,  op_code::while_cond,   false, op_code::none,         op_code::none},
     {"while?",false,1,associative::left,   50, false, op_category::ctrl_cond,  op_code::while_cond,   op_code::while_end,    false, op_code::none,         op_code::none},
     {"/while",false,1,associative::right,  50, false, op_category::ctrl_end,   op_code::while_end,    op_code::none,         false, op_code::none,         op_code::none}
