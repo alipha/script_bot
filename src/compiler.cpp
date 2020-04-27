@@ -48,10 +48,10 @@ private:
     void handle_pair(const operation_type &op_type, const operation_type &top_op_type);
     void handle_map_label(mut<std::size_t> index);
 
-    void handle_ctrl_cond(mut<operation_type> op_type_ref, mut<bool> in_binary_context);
-    void handle_ctrl_end(mut<operation_type> op_type_ref, mut<bool> in_binary_context, mut<std::size_t> index);
+    void handle_ctrl_cond(mut<operation_type> op_type_ref);
+    void handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::size_t> index);
     
-    bool pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<bool> in_binary_context, mut<std::size_t> index);
+    bool pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<std::size_t> index);
 
     std::uint8_t local_var_index(std::string_view name);
 
@@ -154,6 +154,7 @@ void compiler_impl::accum(std::string_view token, const operation_type &op_type,
     case op_code::if_cond:
     case op_code::logic_and:
     case op_code::logic_or:
+    case op_code::coalesce:
         jump_indexes.push(result.append(static_cast<std::uint32_t>(0)));
         break;
     case op_code::while_end: {
@@ -169,7 +170,8 @@ void compiler_impl::accum(std::string_view token, const operation_type &op_type,
     case op_code::if_end:
     case op_code::else_end:
     case op_code::logic_and_end:
-    case op_code::logic_or_end: {
+    case op_code::logic_or_end: 
+    case op_code::coalesce_end: {
         std::size_t jump_index = pop(jump_indexes);
         //debug_out("If Patching: " + std::to_string(jump_index) + " with " + std::to_string(result.size()));
         result.patch(jump_index, static_cast<std::uint32_t>(result.size()));
@@ -303,9 +305,8 @@ void compiler_impl::handle_map_label(mut<std::size_t> index) {
 }
 
 
-void compiler_impl::handle_ctrl_cond(mut<operation_type> op_type_ref, mut<bool> in_binary_context) {
+void compiler_impl::handle_ctrl_cond(mut<operation_type> op_type_ref) {
 	auto &op_type = op_type_ref.get();
-    auto &in_binary = in_binary_context.get();
 
     if(!op_codes.empty()) {
         operation_type top_op_type = lookup_operation(op_codes.top());
@@ -313,21 +314,18 @@ void compiler_impl::handle_ctrl_cond(mut<operation_type> op_type_ref, mut<bool> 
         if(top_op_type.category == op_category::ctrl_cond) {
             pop_op_code(top_op_type);
             op_type = top_op_type;
-            in_binary = false;
         }
     } 
 }
 
 
-void compiler_impl::handle_ctrl_end(mut<operation_type> op_type_ref, mut<bool> in_binary_context, mut<std::size_t> index) {
+void compiler_impl::handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::size_t> index) {
 	auto &op_type = op_type_ref.get();
-    auto &in_binary = in_binary_context.get();
     auto &i = index.get();
 
     operation_type top_op_type;
     
     while(!op_codes.empty() && (top_op_type = lookup_operation(op_codes.top())).category == op_category::ctrl_end) {
-        in_binary = false;
 
         if(top_op_type.code == op_code::if_end && tokens[i + 1] == "else") {
             op_codes.top() = op_code::else_end;
@@ -342,7 +340,7 @@ void compiler_impl::handle_ctrl_end(mut<operation_type> op_type_ref, mut<bool> i
 }
 
 
-bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<bool> in_binary_context, mut<std::size_t> index) {
+bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<std::size_t> index) {
     auto &op_type = op_type_ref.get();
     op_code top_code;
 
@@ -353,10 +351,10 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
             handle_pair(op_type, top_op_type);
 
             if(top_op_type.code == op_code::left_paren) {
-                handle_ctrl_cond(op_type_ref, in_binary_context);
+                handle_ctrl_cond(op_type_ref);
                 //debug_out("left paren " + std::to_string(in_binary_context.get()));
             } else if(top_op_type.code == op_code::block_start) {
-                handle_ctrl_end(op_type_ref, in_binary_context, index);
+                handle_ctrl_end(op_type_ref, index);
                 //debug_out("block start " + std::to_string(in_binary_context.get()));
             }
 
@@ -393,10 +391,10 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
         
         op_code last_code = op_type.code; 
         operation_type last_type = lookup_operation(last_code);
+        in_binary_context = last_type.is_binary_next;
 
         if(token == ";") {
             op_type = lookup_operation(op_code::semicolon);
-            in_binary_context = true;
         } else {
             op_type = lookup_operation(token, in_binary_context);
         }
@@ -426,13 +424,8 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
                 throw std::runtime_error("`"s + token + "` was not expected at this point.");
 
             accum_operand(token);
-            in_binary_context = true;
             continue;
         }
-
-        in_binary_context = op_type.in_binary_context;
-        if(op_type.operand_count == 2 || op_type.code == op_code::semicolon)
-            in_binary_context = !in_binary_context;
 
         if(op_type.operand_count == 0) {
             if constexpr(debug) {
@@ -450,7 +443,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
         }
         
 
-        if(pop_op_codes(token, mut(op_type), mut(in_binary_context), mut(i)))
+        if(pop_op_codes(token, mut(op_type), mut(i)))
             continue;
         
 
@@ -463,7 +456,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             accum(op_type.symbol, op_type);
 
             if(op_type.code == op_code::semicolon) {
-                handle_ctrl_end(mut(op_type), mut(in_binary_context), mut(i));
+                handle_ctrl_end(mut(op_type), mut(i));
 
                 if(!op_codes.empty() && op_codes.top() != op_code::block_start 
                         && lookup_operation(op_codes.top()).category != op_category::ctrl_end)

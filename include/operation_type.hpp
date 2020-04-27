@@ -128,6 +128,7 @@ enum associative : std::uint8_t {
 struct operation_type {
     std::string_view symbol;
     bool in_binary_context;
+    bool is_binary_next;
     int operand_count;
     associative associativity;
     int precedence;

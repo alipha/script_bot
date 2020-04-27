@@ -9,6 +9,7 @@
 #include "stack_util.hpp"
 #include "string_util.hpp"
 
+#include <ctime>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -32,6 +33,9 @@ private:
     void map_add(std::stack<object> &operands);
     void execute_binary_op(std::stack<object> &operands, op_code code);
     void execute_unary_op(std::stack<object> &operands, op_code code);
+    void execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code);
+    void execute_short_circuit(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code, bool jump_value);
+    void execute_coalesce(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code);
 
     memory *mem;
     object last_value;
@@ -76,10 +80,10 @@ auto to_optional_int(Int &&x) {
 */
 
 
-void execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code) {
+void interpreter_impl::execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code) {
     if constexpr(debug) {
         if(operands.empty()) {
-            throw std::logic_error("execute_if_statement with zero operands. op_code: "s
+            throw std::logic_error("execute_control_statement with zero operands. op_code: "s
                     + lookup_operation(code).symbol);
         }
     }
@@ -91,14 +95,56 @@ void execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> 
 }
 
 
+void interpreter_impl::execute_short_circuit(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code, bool jump_value) {
+    if constexpr(debug) {
+        if(operands.empty()) {
+            throw std::logic_error("execute_short_circuit with zero operands. op_code: "s
+                    + lookup_operation(code).symbol);
+        }
+    }
+
+    std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
+
+    if(operands.top().to_bool() == jump_value)
+        buffer.seek_abs(jump_pos);
+    else
+        operands.pop();
+}
+
+
+void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code) {
+    if constexpr(debug) {
+        if(operands.empty()) {
+            throw std::logic_error("execute_coalesce with zero operands. op_code: "s
+                    + lookup_operation(code).symbol);
+        }
+    }
+
+    std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
+
+    if(!std::holds_alternative<std::monostate>(operands.top().value()))
+        buffer.seek_abs(jump_pos);
+    else
+        operands.pop();
+}
+
+
 std::string interpreter_impl::execute(const std::vector<char> &program) {
+    std::time_t start = std::time(nullptr);
     memory_buffer<debug> buffer(program);
     std::stack<object> operands;
     last_value = object::type(std::monostate());
 
     mem->push_frame(*buffer.read<std::uint8_t>());
+    int loops = 1000;
 
     while(buffer.position() < buffer.size()) {
+        if(--loops == 0) {
+            if(std::time(nullptr) - start > 30)
+                throw std::runtime_error("Execution terminated after 30 seconds");
+            loops = 1000;
+        }
+
         op_code code = *buffer.read<op_code>();
       
         switch(code) { 
@@ -149,6 +195,13 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         case op_code::if_cond:
         case op_code::while_cond:
             execute_control_statement(buffer, operands, code);
+            break;
+        case op_code::logic_and:
+        case op_code::logic_or:
+            execute_short_circuit(buffer, operands, code, code == op_code::logic_or);
+            break;
+        case op_code::coalesce:
+            execute_coalesce(buffer, operands, code);
             break;
         default:
             if constexpr(debug) {

@@ -62,7 +62,7 @@ void tokenizer::tokenize() {
                 finish_token = true;
             }
 
-            if(std::strchr("*&-+|<>", ch)) {
+            if(std::strchr("?*&-+|<>", ch)) {
                 if(prev_ch != ch)
                     finish_token = true;
             } else if(ch == '=') {
