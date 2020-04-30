@@ -137,13 +137,17 @@ struct operation_type {
     op_code code;
     op_code replace_with;
     bool has_left_pair;
+    bool allow_empty_pair;
     op_code primary_right_pair;
     op_code other_right_pair;
 };
 
 
+operation_type lookup_operation(std::string_view symbol, bool in_binary_context, const operation_type &last_type);
 operation_type lookup_operation(std::string_view symbol, bool in_binary_context);
 operation_type lookup_operation(op_code code);
+
+bool is_empty_pair(const operation_type &left, const operation_type &right);
 
 bool has_lower_precedence(op_code current_code, op_code top_code);
 

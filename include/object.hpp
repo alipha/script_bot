@@ -37,9 +37,9 @@ public:
 
     non_null_type non_null_value() const;
 
-    std::optional<std::string> to_optional_string(std::size_t depth = 0, bool format = false) const;
+    std::optional<std::string> to_optional_string(std::size_t depth = 0, std::size_t *count = nullptr, bool format = false) const;
 
-    std::string to_string(std::size_t depth = 0, bool format = false) const;
+    std::string to_string(std::size_t depth = 0, std::size_t *count = nullptr, bool format = false) const;
 
     int_type to_int() const;
 

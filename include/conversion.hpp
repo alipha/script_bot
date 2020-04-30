@@ -26,27 +26,27 @@ inline std::uint64_t to_int(std::uint64_t arg) { return arg; }
 
 
 
-inline std::optional<std::string> to_optional_string(std::monostate,   std::size_t = 0, bool = false) { 
+inline std::optional<std::string> to_optional_string(std::monostate,   std::size_t = 0, std::size_t* = nullptr, bool = false) { 
     return {};
 }
 
-inline std::optional<std::string> to_optional_string(const func_ref &, std::size_t = 0, bool = false) { 
+inline std::optional<std::string> to_optional_string(const func_ref &, std::size_t = 0, std::size_t* = nullptr, bool = false) { 
     return {"<function>"}; 
 }
 
-inline std::optional<std::string> to_optional_string(std::uint64_t v,  std::size_t = 0, bool = false) { 
+inline std::optional<std::string> to_optional_string(std::uint64_t v,  std::size_t = 0, std::size_t* = nullptr, bool = false) { 
     return {std::to_string(v)};
 }
 
-inline std::optional<std::string> to_optional_string(std::int64_t v,   std::size_t = 0, bool = false) { 
+inline std::optional<std::string> to_optional_string(std::int64_t v,   std::size_t = 0, std::size_t* = nullptr, bool = false) { 
     return {std::to_string(v)};
 }
 
-std::optional<std::string> to_optional_string(const string_ref &s,     std::size_t = 0, bool format = false);
-std::optional<std::string> to_optional_string(double v,                std::size_t = 0, bool = false);
+std::optional<std::string> to_optional_string(const string_ref &s,     std::size_t = 0, std::size_t* = nullptr, bool format = false);
+std::optional<std::string> to_optional_string(double v,                std::size_t = 0, std::size_t* = nullptr, bool = false);
 
-std::optional<std::string> to_optional_string(const array_ref &ref,    std::size_t = 0, bool = false);
-std::optional<std::string> to_optional_string(const map_ref &ref,      std::size_t = 0, bool = false);
+std::optional<std::string> to_optional_string(const array_ref &ref,    std::size_t = 0, std::size_t* = nullptr, bool = false);
+std::optional<std::string> to_optional_string(const map_ref &ref,      std::size_t = 0, std::size_t* = nullptr, bool = false);
 
 
 

@@ -61,6 +61,8 @@ private:
         jump_indexes = {};
         while_indexes = {};
         op_codes = {};
+        last_code = op_code::none;
+        last_type = {};
         tokens = {};
         result.clear();
         tokenized_result.clear();
@@ -75,6 +77,8 @@ private:
     std::stack<std::size_t> jump_indexes;
     std::stack<std::size_t> while_indexes;
     std::stack<op_code> op_codes;
+    op_code last_code;
+    operation_type last_type;
     std::vector<std::string_view> tokens;
     //std::vector<std::string_view>::iterator token_it;
 
@@ -274,7 +278,12 @@ void compiler_impl::handle_pair(const operation_type &op_type, const operation_t
 
     if(top_op_type.primary_right_pair != code && top_op_type.other_right_pair != code)
         throw std::runtime_error("Mismatched "s + top_op_type.symbol);
-    pop_op_code(top_op_type);
+
+    if(is_empty_pair(last_type, op_type))
+        op_codes.pop();
+    else
+        pop_op_code(top_op_type);
+
     code = top_op_type.primary_right_pair;
 
     accum(op_type.symbol, lookup_operation(code));
@@ -284,7 +293,10 @@ void compiler_impl::handle_pair(const operation_type &op_type, const operation_t
 void compiler_impl::handle_map_label(mut<std::size_t> index) {
 	std::size_t &i = index.get();
 
-    std::string_view token = tokens[++i];
+    std::string_view token = tokens[++i];                             
+    if(token == "}")
+        return;
+
     operation_type op_type = lookup_operation(token, false);
 
     if(op_type.code != op_code::none)
@@ -389,14 +401,14 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
     for(std::size_t i = 0; i < tokens.size(); ++i) {
         std::string_view token = tokens[i];
         
-        op_code last_code = op_type.code; 
-        operation_type last_type = lookup_operation(last_code);
+        last_code = op_type.code; 
+        last_type = lookup_operation(last_code);
         in_binary_context = last_type.is_binary_next;
 
-        if(token == ";") {
+        if(token == ";" && (last_type.category == op_category::ctrl_cond || last_type.category == op_category::ctrl_end || last_code == op_code::block_start || last_code == op_code::block_end || last_code == op_code::semicolon)) {
             op_type = lookup_operation(op_code::semicolon);
         } else {
-            op_type = lookup_operation(token, in_binary_context);
+            op_type = lookup_operation(token, in_binary_context, last_type);
         }
 
         if(op_type.code == op_code::colon || op_type.code == op_code::else_start) {
@@ -472,11 +484,9 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             throw std::runtime_error("Expected ( to follow "s + token);
     }
 
-    if constexpr(debug) {
-        if(!op_codes.empty()) {
-            throw std::logic_error("Expected stack to be empty. Size: " + op_codes.size());
-        }
-    }
+    if(!op_codes.empty())
+        throw std::logic_error("Unmatched: "s + lookup_operation(op_codes.top()).symbol);
+
 /*        if(op_codes.size() != 1 || op_codes.top() != op_code::semicolon) {
             throw std::logic_error("Expected stack to only contain op_code::semicolon. Size: " 
                     + std::to_string(op_codes.size()) + ", code: " 

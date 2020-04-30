@@ -10,7 +10,7 @@
 thread_local std::stringstream ss;
 
 
-std::optional<std::string> to_optional_string(const string_ref &s, std::size_t, bool format) {
+std::optional<std::string> to_optional_string(const string_ref &s, std::size_t, std::size_t *, bool format) {
     if(!format) 
         return {*s};
 
@@ -28,7 +28,7 @@ std::optional<std::string> to_optional_string(const string_ref &s, std::size_t, 
 }
 
 
-std::optional<std::string> to_optional_string(double v, std::size_t, bool) {
+std::optional<std::string> to_optional_string(double v, std::size_t, std::size_t *, bool) {
     ss.str("");
     ss.precision(15);
     ss << v;
@@ -36,16 +36,23 @@ std::optional<std::string> to_optional_string(double v, std::size_t, bool) {
 }
 
 
-std::optional<std::string> to_optional_string(const array_ref &ref, std::size_t depth, bool) {
+std::optional<std::string> to_optional_string(const array_ref &ref, std::size_t depth, std::size_t *count, bool) {
     if(ref->empty())
         return {"[]"};
     if(depth >= 20)
         return "...";
 
+    std::size_t count_value = 0;
+    if(!count)
+        count = &count_value;
+
+    if(*count > 1000)
+        return "...";
+
     std::string out("[");
 
     for(const object &obj : *ref)
-        out += obj.to_string(depth+1, true) + ", ";
+        out += obj.to_string(depth+1, &++*count, true) + ", ";
 
     out.pop_back();
     out.back() = ']';
@@ -53,16 +60,23 @@ std::optional<std::string> to_optional_string(const array_ref &ref, std::size_t 
 }
 
 
-std::optional<std::string> to_optional_string(const map_ref &ref, std::size_t depth, bool) {
+std::optional<std::string> to_optional_string(const map_ref &ref, std::size_t depth, std::size_t *count, bool) {
     if(ref->empty())
         return {"{}"};
     if(depth >= 20)
         return "...";
 
+    std::size_t count_value = 0;
+    if(!count)
+        count = &count_value;
+
+    if(*count > 1000)
+        return "...";
+                  
     std::string out("{");
 
     for(const auto &keypair : *ref)
-        out += keypair.first + ": " + keypair.second.to_string(depth+1, true) + ", ";
+        out += keypair.first + ": " + keypair.second.to_string(depth+1, &++*count, true) + ", ";
 
     out.pop_back();
     out.back() = '}';

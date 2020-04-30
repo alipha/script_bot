@@ -5,6 +5,7 @@
 #include "operation_type.hpp"
 #include "stack_util.hpp"
 #include "string_util.hpp"
+#include "variant_util.hpp"
 
 #include <stack>
 #include <string>
@@ -33,8 +34,13 @@ void unary_op(object &last_value, std::stack<object> &operands, op_code code) {
         }
     }
 
-    object operand = pop(operands);
+    bool is_pre = (code == op_code::pre_inc || code == op_code::pre_dec);
+    bool is_post = (code == op_code::post_inc || code == op_code::post_dec);
+    object operand = is_pre ? operands.top() : pop(operands);
     
+    if(is_post)
+        operands.push(to_variant<object::type>(operand.value()));
+
     if(code == op_code::logic_not) {
         operands.push(object(static_cast<std::int64_t>(!operand.to_bool())));
         return;
@@ -58,14 +64,27 @@ void unary_op(object &last_value, std::stack<object> &operands, op_code code) {
             case op_code::plus:      return static_cast<std::int64_t>(v);
 			case op_code::negate:    return -static_cast<std::int64_t>(v);
             case op_code::bit_not:   return ~to_int(v);
-            //case op_code::logic_not: return static_cast<std::int64_t>(!v);
+            case op_code::pre_inc:   return v + 1;
+            case op_code::pre_dec:   return v - 1;
+            case op_code::post_inc:  return v + 1;
+            case op_code::post_dec:  return v - 1;
             default:
                 throw std::logic_error("Currently unsupported unary op: "s + lookup_operation(code).symbol);
             }
         }
     }, operand.non_null_value());
 
-    operands.push(result);
+    if(is_pre || is_post) {
+        if(var_ref *var = std::get_if<var_ref>(&operand.get())) {
+            **var = to_variant<object::type>(result.value());
+        } else if(lvalue_ref *lvalue = std::get_if<lvalue_ref>(&operand.get())) {
+            **lvalue = to_variant<object::type>(result.value()); 
+        } else {
+            throw std::runtime_error("left of "s + lookup_operation(code).symbol + " is not assignable");
+        }
+    } else {
+        operands.push(result);
+    }
 }
 
 

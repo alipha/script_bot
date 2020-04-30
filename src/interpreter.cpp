@@ -223,8 +223,9 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         }
     }
     
+    std::string result = last_value.to_string();
     mem->pop_frame();
-    return last_value.to_string();
+    return result;
 }
 
 
