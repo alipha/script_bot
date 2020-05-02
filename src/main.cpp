@@ -43,7 +43,7 @@ std::string run(compiler &c, interpreter &i, std::string_view code) {
 
 
 void run_irc(compiler &c, interpreter &i) {
-    irc_client irc;
+    irc_client irc("settings.txt");
     irc.login();
 
     while(true) {
@@ -52,7 +52,7 @@ void run_irc(compiler &c, interpreter &i) {
         if(msg.action() != "PRIVMSG")
             continue;
 
-        if(msg.sender_nick() == "Alipha" && msg.target() == "LiphBot") {
+        if(msg.is_admin_msg()) {
             irc.write(msg.message());
             if(starts_with(msg.message(), "QUIT"))
                 return;

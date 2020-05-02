@@ -1,0 +1,22 @@
+# only one server, port, and nick are allowed
+server=irc.freenode.net
+port=6667
+nick=LiphBot
+
+# multiple admin= lines are allowed
+admin=Alipha
+#admin=LiphBotAdmin
+
+# multiple auth= lines are allowed
+# if no auth lines beginning with NICK or USER are provided,
+# then `NICK ${nick}` and `USER ${nick} * * :AliphaBot 2.0` are used
+#auth=PASS foobar
+#auth=NICK LiphBot
+#auth=USER LiphBot * * :AliphaBot 2.0
+
+# multiple on_connect= lines are allowed
+# by default, `JOIN #aliphaBot` is performed
+on_connect=JOIN #aliphaBot
+
+# to do nothing on connect, provide an empty line:
+#on_connect=

@@ -1,4 +1,5 @@
 #include "irc.hpp"
+#include "settings.hpp"
 #include "string_util.hpp"
 
 #include <cstddef>
@@ -17,7 +18,8 @@ using namespace std::string_literals;
 
 class irc_client_impl {
 public:
-    irc_client_impl() : context(), sock(context), sock_buf(), sock_stream(&sock_buf) {}
+    irc_client_impl(const std::string &filename) 
+        : setting(filename), context(), sock(context), sock_buf(), sock_stream(&sock_buf) {}
 
     void login();
     void write(std::string_view message);
@@ -25,6 +27,12 @@ public:
     irc_message read();
     
 private:
+    void auth();
+    bool is_admin(std::string_view nickname) const;
+    
+    std::string bot_nick() const { return std::string(setting.first("nick").value_or("LiphBot")); }
+
+    settings setting;
     boost::asio::io_service context;
     boost::asio::ip::tcp::socket sock;
     boost::asio::streambuf sock_buf;
@@ -38,13 +46,6 @@ pos_size_pair irc_message::tokenize(std::size_t &pos) {
 
     if(start >= raw_line.size())
         return {raw_line.size(), 0};
-
-    /*
-    if(raw_line[start] == ':') {
-        pos = raw_line.size();
-        return {start + 1, raw_line.size() - start - 1};
-    }
-    */
 
     std::size_t space = raw_line.find(' ', start);
 
@@ -88,7 +89,9 @@ void irc_message::parse() {
 }
 
 
-irc_client::irc_client() : impl(std::make_unique<irc_client_impl>()) {}
+irc_client::irc_client(const std::string &settings_filename) 
+    : impl(std::make_unique<irc_client_impl>(settings_filename)) {}
+
 irc_client::~irc_client() {}
 
 void irc_client::login() { impl->login(); }
@@ -101,7 +104,10 @@ irc_message irc_client::read() { return impl->read(); }
 
 void irc_client_impl::login() {
     tcp::resolver resolver(context);
-    tcp::resolver::query query("irc.freenode.net", "6667", tcp::resolver::query::numeric_service);
+    tcp::resolver::query query(
+            std::string(setting.first("server").value_or("irc.freenode.net")),
+            std::string(setting.first("port")  .value_or("6667")), 
+            tcp::resolver::query::numeric_service);
     
     tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
     tcp::resolver::iterator end;
@@ -117,12 +123,16 @@ void irc_client_impl::login() {
     if (error)
         throw boost::system::system_error(error);
 
-    write("NICK LiphBot");
-    write("USER LiphBot * * :AliphaBot 2.0");
+    auth();
 
     while(read().action() != "376") {}  // read until end of MOTD
 
-    write("JOIN #aliphaBot");
+    if(setting.is_set("on_connect")) {
+        for(const std::string &line : setting.all("on_connect"))
+            write(line);
+    } else {
+        write("JOIN #aliphaBot");
+    }
 }
 
 
@@ -156,6 +166,44 @@ irc_message irc_client_impl::read() {
             write("PONG :"s + msg.target() + msg.message());
     } while(msg.action() == "PING");
 
+
+    msg.set_is_admin_msg(
+            to_lower(msg.target()) == to_lower(bot_nick())
+            && is_admin(msg.sender_nick())
+    );
+
     return msg;
+}
+    
+
+void irc_client_impl::auth() {
+    bool sent_nick = false;
+    bool sent_user = false;
+    for(const std::string &line : setting.all("auth")) {
+        write(line);
+        if(starts_with(to_lower(line), "nick "))
+            sent_nick = true;
+        if(starts_with(to_lower(line), "user "))
+            sent_user = true;
+    }
+
+    if(!sent_nick)
+        write("NICK " + bot_nick());
+    if(!sent_user)
+        write("USER " + bot_nick() + " * * :AliphaBot 2.0");
+}
+
+
+bool irc_client_impl::is_admin(std::string_view nickname) const {
+    std::string nick = to_lower(nickname);
+
+    if(auto &&admins = setting.all("admin"); !admins.empty()) {
+        for(const std::string &admin : admins)
+            if(to_lower(admin) == nick)
+                return true;
+        return false;
+    } else {
+        return nick == "alipha";
+    }
 }
 
