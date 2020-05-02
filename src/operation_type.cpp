@@ -203,7 +203,7 @@ operation_type lookup_operation(std::string_view symbol, bool in_binary_context,
 
         if(it2 != symbol_operation_map.end()) {
             if(is_empty_pair(last_type, it2->second))
-                return it->second;
+                return it2->second;
 
             throw std::runtime_error(it2->second.symbol + " was not expected in "s 
                     + (in_binary_context ? "binary" : "unary") + " context");

@@ -8,6 +8,8 @@
 #include "string_util.hpp"
 #include "util.hpp"
 
+//#include <iostream>
+
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -44,9 +46,9 @@ private:
 
     void pop_op_code(const operation_type &top);
 
-    void handle_comma(op_code top_code, mut<std::size_t> index);
+    op_code handle_comma(op_code top_code, mut<std::size_t> index);
     void handle_pair(const operation_type &op_type, const operation_type &top_op_type);
-    void handle_map_label(mut<std::size_t> index);
+    op_code handle_map_label(mut<std::size_t> index, bool map_start);
 
     void handle_ctrl_cond(mut<operation_type> op_type_ref);
     void handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::size_t> index);
@@ -253,7 +255,7 @@ void compiler_impl::pop_op_code(const operation_type &top) {
 }
 
 
-void compiler_impl::handle_comma(op_code top_code, mut<std::size_t> index) {
+op_code compiler_impl::handle_comma(op_code top_code, mut<std::size_t> index) {
     operation_type op_type;
 
     if(top_code == op_code::map_start) {
@@ -269,7 +271,8 @@ void compiler_impl::handle_comma(op_code top_code, mut<std::size_t> index) {
     accum(op_type.symbol, op_type);
 
     if(op_type.code == op_code::map_add)
-        handle_map_label(index);
+        return handle_map_label(index, false);
+    return op_type.code;
 }
 
 
@@ -279,23 +282,21 @@ void compiler_impl::handle_pair(const operation_type &op_type, const operation_t
     if(top_op_type.primary_right_pair != code && top_op_type.other_right_pair != code)
         throw std::runtime_error("Mismatched "s + top_op_type.symbol);
 
-    if(is_empty_pair(last_type, op_type))
-        op_codes.pop();
-    else
-        pop_op_code(top_op_type);
-
+    pop_op_code(top_op_type);
     code = top_op_type.primary_right_pair;
 
     accum(op_type.symbol, lookup_operation(code));
 }
 
 
-void compiler_impl::handle_map_label(mut<std::size_t> index) {
+op_code compiler_impl::handle_map_label(mut<std::size_t> index, bool start_map) {
 	std::size_t &i = index.get();
 
     std::string_view token = tokens[++i];                             
-    if(token == "}")
-        return;
+    if(start_map && token == "}") {
+        op_codes.pop();
+        return op_code::map_end;
+    }
 
     operation_type op_type = lookup_operation(token, false);
 
@@ -313,6 +314,7 @@ void compiler_impl::handle_map_label(mut<std::size_t> index) {
     if(token != ":")
         throw std::runtime_error("Expected colon after map label, not "s + token);
 
+    return op_code::colon;
     //op_codes.push(op_code::colon); 
 }
 
@@ -409,6 +411,12 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             op_type = lookup_operation(op_code::semicolon);
         } else {
             op_type = lookup_operation(token, in_binary_context, last_type);
+            if(is_empty_pair(last_type, op_type)) {
+                pop_op_code(last_type);
+                op_type.code = last_type.primary_right_pair;
+                continue;
+            }
+           //std::cout << "here " << op_type.symbol << ' ' << op_type.precedence << ' ' << last_type.symbol << ' ' << last_type.operand_count << std::endl;
         }
 
         if(op_type.code == op_code::colon || op_type.code == op_code::else_start) {
@@ -449,7 +457,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             op_codes.push(op_type.code);
 
             if(op_type.code == op_code::map_start)
-                handle_map_label(mut(i));
+                op_type.code = handle_map_label(mut(i), true);
             
             continue;
         }
@@ -460,7 +468,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
         
 
         if(op_type.code == op_code::comma && !op_codes.empty()) {
-            handle_comma(op_codes.top(), mut(i));
+            op_type.code = handle_comma(op_codes.top(), mut(i));
             continue;
         }
 
