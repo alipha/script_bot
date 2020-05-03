@@ -52,34 +52,6 @@ std::string interpreter::execute(const std::vector<char> &program) {
 }
 
 
-/*
-template<typename Func>
-value_type do_with_doubles(const value_type &left, const value_type &right, Func) {
-    return std::visit([](auto &&left, auto &&right) {
-        using leftT = std::decay_t<decltype(left)>;
-        using rightT = std::decay_t<decltype(right)>;
-
-        if constexpr(std::is_same_v<leftT, double> || std::is_same_v<rightT, double>) {
-            return Func(static_cast<double>(left), static_cast<double>(right));
-        } else {
-            return Func(left, right);
-        }
-    });
-}
-*/
-
-/*
-template<typename Int>
-auto to_optional_int(Int &&x) {
-    using T = std::decay_t<Int>;
-    if constexpr(std::is_same_v<T, std::monostate>)
-        return std::optional<std::int64_t>();
-    else
-        return std::optional<T>(x);
-}
-*/
-
-
 void interpreter_impl::execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code) {
     if constexpr(debug) {
         if(operands.empty()) {
