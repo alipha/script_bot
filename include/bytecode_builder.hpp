@@ -1,0 +1,38 @@
+#ifndef LIPH_BYTECODE_BUILDER_HPP
+#define LIPH_BYTECODE_BUILDER_HPP
+
+#include "operation_type.hpp"
+
+#include <memory>
+#include <stack>
+#include <string>
+#include <string_view>
+#include <vector>
+
+
+class builder_impl;
+class memory;
+
+
+class bytecode_builder {
+public:
+    bytecode_builder(memory *m, std::stack<op_code> *op_codes, bool generate_tokenized);
+    ~bytecode_builder();
+    
+    void append(std::string_view token, op_code code);
+    void append(std::string_view token, const operation_type &op_type);
+    void append(std::string_view token, const operation_type &op_type, op_code code);
+    void append_operand(std::string_view token);
+
+    void reset();
+    
+    const std::string &tokenized() const;
+
+    std::vector<char> finalize_bytecode();
+    
+private:
+    std::unique_ptr<builder_impl> impl;
+};
+
+
+#endif

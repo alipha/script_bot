@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
                 std::cerr << "boost exception: " << e.what() << std::endl;
             }
             if(std::time(nullptr) - start_time > 600)
-                delay = 10;
+                delay = 9;
             std::this_thread::sleep_for(std::chrono::seconds(delay));
             delay *= 2;
         }

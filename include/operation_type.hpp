@@ -161,7 +161,7 @@ inline bool is_binary_op(op_code code) {
 }
 
 inline bool is_unary_op(op_code code) {
-    return code >= op_code::pre_inc && code <= op_code::while_end;
+    return code >= op_code::pre_inc && code <= op_code::ret;
 }
 
 inline bool is_binary_comp(op_code code) {
