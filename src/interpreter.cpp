@@ -110,9 +110,12 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
 
     mem->clear_stack();
     mem->push_frame(*buffer.read<std::uint8_t>());
+    
+    std::uint8_t capture_count = *buffer.read<std::uint8_t>();
+    std::size_t code_size = buffer.size() - capture_count;
     int loops = 1000;
 
-    while(buffer.position() < buffer.size()) {
+    while(buffer.position() < code_size) {
         if(--loops == 0) {
             if(std::time(nullptr) - start > 30)
                 throw std::runtime_error("Execution terminated after 30 seconds");

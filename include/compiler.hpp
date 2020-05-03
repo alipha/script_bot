@@ -15,6 +15,11 @@ public:
     compiler(memory *m, bool generate_tokenized = false);
     ~compiler();
 
+    compiler(const compiler &) = delete;
+    compiler(compiler &&) = delete;
+    compiler &operator=(const compiler &) = delete;
+    compiler &operator=(compiler &&) = delete;
+
     std::vector<char> compile(std::vector<std::string_view> token_list);
 
     const std::string &tokenized() const;

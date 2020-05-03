@@ -7,6 +7,7 @@
 #include "util.hpp"
 
 #include <cstring>
+#include <deque>
 #include <memory>
 #include <stack>
 #include <stdexcept>
@@ -23,11 +24,17 @@ using namespace std::string_literals;
 
 class compiler_impl {
 public:
-    compiler_impl(memory *m, bool generate_tokenized) : builder(m, &op_codes, generate_tokenized) {}
+    compiler_impl(memory *m, bool generate_tokenized) : mem(m), gen_tokenized(generate_tokenized) {}
+
+    // non-movable because the builders' parents pointers will end up pointing to the wrong parents
+    compiler_impl(const compiler_impl &) = delete;
+    compiler_impl(compiler_impl &&) = delete;
+    compiler_impl &operator=(const compiler_impl &) = delete;
+    compiler_impl &operator=(compiler_impl &&) = delete;
 
     std::vector<char> compile(std::vector<std::string_view> token_list);
     
-    const std::string &tokenized() const { return builder.tokenized(); }
+    const std::string &tokenized() const { return builders.front().tokenized(); }
 
 private:
     void pop_op_code(const operation_type &top);
@@ -47,14 +54,16 @@ private:
         last_code = op_code::none;
         last_type = {};
         tokens = {};
-        builder.reset();
+        builders.clear();
     }
 
+    memory *mem;
+    bool gen_tokenized;
     std::stack<op_code> op_codes;
     op_code last_code;
     operation_type last_type;
     std::vector<std::string_view> tokens;
-    bytecode_builder builder;
+    std::deque<bytecode_builder> builders;
     //std::vector<std::string_view>::iterator token_it;
 };
 
@@ -76,7 +85,7 @@ const std::string &compiler::tokenized() const { return impl->tokenized(); }
 void compiler_impl::pop_op_code(const operation_type &top) {
     op_codes.pop();
     if(top.operand_count != 0)
-        builder.append(top.symbol, top);
+        builders.front().append(top.symbol, top);
 }
 
 
@@ -93,7 +102,7 @@ op_code compiler_impl::handle_comma(op_code top_code, mut<std::size_t> index) {
         throw std::runtime_error("Comma not within (), [] or {}");
     }
 
-    builder.append(op_type.symbol, op_type);
+    builders.front().append(op_type.symbol, op_type);
 
     if(op_type.code == op_code::map_add)
         return handle_map_label(index, false);
@@ -110,7 +119,7 @@ void compiler_impl::handle_pair(const operation_type &op_type, const operation_t
     pop_op_code(top_op_type);
     code = top_op_type.primary_right_pair;
 
-    builder.append(op_type.symbol, lookup_operation(code));
+    builders.front().append(op_type.symbol, lookup_operation(code));
 }
 
 
@@ -129,10 +138,10 @@ op_code compiler_impl::handle_map_label(mut<std::size_t> index, bool start_map) 
         throw std::runtime_error("`"s + token + "` is not a valid map label");
 
     if(token[0] == '"' || token[0] == '\'') {
-        builder.append(token, op_code::str_lit);
+        builders.front().append(token, op_code::str_lit);
     } else {
         std::string t = "\""s + token + "\"";
-        builder.append({t.data(), t.size()}, op_code::str_lit);
+        builders.front().append({t.data(), t.size()}, op_code::str_lit);
     }
 
     token = tokens[++i];
@@ -169,7 +178,7 @@ void compiler_impl::handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::si
         if(top_op_type.code == op_code::if_end && tokens[i + 1] == "else") {
             op_codes.top() = op_code::else_end;
             op_type = lookup_operation(tokens[++i], false);
-            builder.append(op_type.symbol, op_type);
+            builders.front().append(op_type.symbol, op_type);
             return;
         }
 
@@ -212,6 +221,7 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
 
 std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_list) {
     reset();
+    builders.emplace_front(mem, &builders, &op_codes, gen_tokenized);
 
     tokens = std::move(token_list);
     tokens.push_back(";");
@@ -262,7 +272,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             if(in_binary_context)
                 throw std::runtime_error("`"s + token + "` was not expected at this point.");
 
-            builder.append_operand(token);
+            builders.front().append_operand(token);
             continue;
         }
 
@@ -272,7 +282,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
                     throw std::logic_error("`"s + op_type.symbol + "` shouldn't get here");
             }
 
-            builder.append(token, op_type);
+            builders.front().append(token, op_type);
             op_codes.push(op_type.code);
 
             if(op_type.code == op_code::map_start)
@@ -292,7 +302,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
         }
 
         if(op_type.operand_count == 1 && op_type.associativity == associative::left) {
-            builder.append(op_type.symbol, op_type);
+            builders.front().append(op_type.symbol, op_type);
 
             if(op_type.code == op_code::semicolon) {
                 handle_ctrl_end(mut(op_type), mut(i));
@@ -321,6 +331,6 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
         }
         */
 
-    return builder.finalize_bytecode();
+    return builders.front().finalize_bytecode();
 }
 

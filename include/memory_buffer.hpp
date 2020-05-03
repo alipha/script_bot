@@ -90,6 +90,8 @@ public:
         new (&buf[location]) TObj(std::forward<T>(value));
     }
 
+    void extend(std::size_t amount) { buf.resize(buf.size() + amount); }
+    
     void seek_abs(std::size_t location) { pos = location; }
     
     void seek_rel(std::ptrdiff_t amount) { 

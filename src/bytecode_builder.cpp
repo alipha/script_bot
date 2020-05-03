@@ -7,9 +7,13 @@
 #include "string_util.hpp"
 #include "tokenizer.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <stack>
 #include <string>
 #include <string_view>
@@ -20,11 +24,30 @@ using namespace std::string_literals;
 class memory;
 
 
+constexpr std::uint8_t capture_index_start = 128;
+
+
+struct capture_mapping {
+    std::uint8_t parent_index;
+    std::uint8_t my_index;
+};
+
+
 class builder_impl {
 public:
-    builder_impl(memory *m, std::stack<op_code> *op_codes_ptr, bool generate_tokenized) 
-        : mem(m), op_codes(op_codes_ptr), gen_tokenized(generate_tokenized) {}
+    builder_impl(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes_ptr, bool generate_tokenized) 
+        : mem(m), 
+          parents(builders), 
+          op_codes(op_codes_ptr), 
+          gen_tokenized(generate_tokenized)
+    { reset(); }
     
+    // non-movable because the parents pointer will probably end up pointing to the wrong one
+    builder_impl(const builder_impl &) = delete;
+    builder_impl(builder_impl &&) = delete;
+    builder_impl &operator=(const builder_impl &) = delete;
+    builder_impl &operator=(builder_impl &&) = delete;
+
     void append(std::string_view token, op_code code) { append(token, lookup_operation(op_code::none), code); }
     void append(std::string_view token, const operation_type &op_type) { append(token, op_type, op_type.code); }
     void append(std::string_view token, const operation_type &op_type, op_code code);
@@ -39,13 +62,19 @@ public:
 private:
     static std::string parse_str_literal(std::string_view str);
 
-    std::uint8_t local_var_index(std::string_view name);
+    std::uint8_t add_capture(std::string_view name, std::uint8_t parent_index);
+    std::uint8_t get_or_add_index(std::string_view name);
+    std::optional<std::uint8_t> get_my_index(std::string_view name) const;
+
 
 
     memory *mem;
+    std::deque<bytecode_builder> *parents;
     std::stack<op_code> *op_codes;
     bool gen_tokenized;
+
     std::unordered_map<std::string, std::uint8_t> local_var_indexes;
+    std::unordered_map<std::string, capture_mapping> capture_indexes;
 
     std::stack<std::size_t> jump_indexes;
     std::stack<std::size_t> while_indexes;
@@ -56,8 +85,8 @@ private:
 
 
 
-bytecode_builder::bytecode_builder(memory *m, std::stack<op_code> *op_codes, bool generate_tokenized)
-    : impl(std::make_unique<builder_impl>(m, op_codes, generate_tokenized)) {}
+bytecode_builder::bytecode_builder(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes, bool generate_tokenized)
+    : impl(std::make_unique<builder_impl>(m, builders, op_codes, generate_tokenized)) {}
 
 bytecode_builder::~bytecode_builder() {}
 
@@ -80,6 +109,7 @@ void bytecode_builder::reset() { impl->reset(); }
 const std::string &bytecode_builder::tokenized() const { return impl->tokenized(); }
 
 std::vector<char> bytecode_builder::finalize_bytecode() { return impl->finalize_bytecode(); }
+
 
 
 void builder_impl::append(std::string_view token, const operation_type &op_type, op_code code) {
@@ -139,7 +169,7 @@ void builder_impl::append(std::string_view token, const operation_type &op_type,
         result.append(token);
         break;
     case op_code::local_var:
-        result.append(local_var_index(token));
+        result.append(get_or_add_index(token));
         break;
     case op_code::int_lit:
         result.append(static_cast<int64_t>(std::stoll(std::string(token))));  // TODO: from_chars?
@@ -179,25 +209,34 @@ void builder_impl::append_operand(std::string_view token) {
 
 void builder_impl::reset() {
         local_var_indexes.clear();
+        capture_indexes.clear();
         jump_indexes = {};
         while_indexes = {};
         result.clear();
         tokenized_result.clear();
 
         result.append(static_cast<std::uint8_t>(0));
-        //result.append(static_cast<std::uint8_t>(0));
+        result.append(static_cast<std::uint8_t>(0));
 }
 
 
 std::vector<char> builder_impl::finalize_bytecode() {
     std::size_t local_var_count = local_var_indexes.size();
-    //local_var_indexes.clear();
+    std::size_t capture_count = capture_indexes.size();
 
-    if(local_var_count > 255) {
+    if(local_var_count >= 127)
         throw std::runtime_error("Too many local variables: " + std::to_string(local_var_count));
-    }
+    if(capture_count >= 127)
+        throw std::runtime_error("Too many captures: " + std::to_string(capture_count));
+    
+    std::size_t capture_start = result.size();
+    result.extend(capture_indexes.size());
 
-    result.buffer()[0] = static_cast<char>(local_var_count);
+    for(auto &capture : capture_indexes)
+        result.patch(capture_start + capture.second.my_index - capture_index_start, capture.second.parent_index);
+
+    result.patch(0, static_cast<std::uint8_t>(local_var_count));
+    result.patch(1, static_cast<std::uint8_t>(capture_count));
     return std::move(result).buffer();
 }
 
@@ -222,8 +261,70 @@ std::string builder_impl::parse_str_literal(std::string_view str) {
 }
 
 
-std::uint8_t builder_impl::local_var_index(std::string_view name) {
-    std::size_t next_index = local_var_indexes.size() + 1;
-    return local_var_indexes.emplace(name, next_index).first->second;
+std::uint8_t builder_impl::add_capture(std::string_view name, std::uint8_t parent_index) {
+    std::uint8_t next_index = capture_indexes.size() + capture_index_start;
+    capture_indexes[std::string(name)] = capture_mapping{parent_index, next_index};
+    return next_index;
+}
+
+
+std::uint8_t builder_impl::get_or_add_index(std::string_view name) {
+
+    // if this builder has the local variable or the capture already, return it
+    std::optional<std::uint8_t> index = get_my_index(name);
+    if(index)
+        return *index;
+
+    // find this builder in the builder list so that we're only looking at
+    // builder parents and not builder children
+    // (thouigh I think *this would always be the front() builder...)
+    auto this_it = std::find_if(parents->begin(), parents->end(), 
+            [this](auto &parent) { return parent.impl.get() == this; });
+
+    if constexpr(debug) {
+        if(this_it == parents->end())
+            throw std::logic_error("builder is not in parents!");
+    }
+
+    // find which parent (or grandparent, etc) builder has the local variable or capture
+    auto it = std::find_if(std::next(this_it), parents->end(),
+            [&index, name](auto &parent) { 
+                index = parent.impl->get_my_index(name);
+                return index.has_value();
+            });
+
+    // if the variable doesn't exist, create it
+    if(it == parents->end()) {
+        std::size_t next_index = local_var_indexes.size() + 1;
+        return local_var_indexes[std::string(name)] = next_index;
+    }
+
+    if constexpr(debug) {
+        if(!index.has_value())
+            throw std::logic_error("index expected to have a value");
+    }
+
+    // add the variable as a capture for each child
+    while(it != this_it) {
+        --it;
+        index = it->impl->add_capture(name, *index);
+    }
+
+    return *index;
+}
+    
+
+std::optional<std::uint8_t> builder_impl::get_my_index(std::string_view name) const {
+    std::string name_str(name);
+
+    auto it = local_var_indexes.find(name_str);
+    if(it != local_var_indexes.end())
+        return it->second;
+
+    auto capture_it = capture_indexes.find(name_str);
+    if(capture_it != capture_indexes.end())
+        return capture_it->second.my_index;
+
+    return {};
 }
 

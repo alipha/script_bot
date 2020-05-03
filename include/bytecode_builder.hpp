@@ -3,6 +3,7 @@
 
 #include "operation_type.hpp"
 
+#include <deque>
 #include <memory>
 #include <stack>
 #include <string>
@@ -16,9 +17,14 @@ class memory;
 
 class bytecode_builder {
 public:
-    bytecode_builder(memory *m, std::stack<op_code> *op_codes, bool generate_tokenized);
+    bytecode_builder(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes, bool generate_tokenized);
     ~bytecode_builder();
-    
+   
+    bytecode_builder(const bytecode_builder &) = delete;
+    bytecode_builder(bytecode_builder &&) = delete;
+    bytecode_builder &operator=(const bytecode_builder &) = delete;
+    bytecode_builder &operator=(bytecode_builder &&) = delete;
+
     void append(std::string_view token, op_code code);
     void append(std::string_view token, const operation_type &op_type);
     void append(std::string_view token, const operation_type &op_type, op_code code);
@@ -31,6 +37,8 @@ public:
     std::vector<char> finalize_bytecode();
     
 private:
+    friend class builder_impl;
+    
     std::unique_ptr<builder_impl> impl;
 };
 
