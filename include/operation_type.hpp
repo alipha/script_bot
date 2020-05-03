@@ -95,15 +95,18 @@ enum class op_code : std::uint8_t {
     while_start,
     while_cond,
     while_end,   // 4c
+    func_lit,
+    ret,
     count,
 
-    global_var,
+    global_var,  // 50
     local_var,
-    int_lit,     // 50
-    uint_lit,
+    param_var,
+    int_lit,
+    uint_lit,    // 54
     float_lit,
     str_lit,
-    null_lit     // 54
+    null_lit     // 57
 };
 
 
@@ -133,6 +136,7 @@ struct operation_type {
     associative associativity;
     int precedence;
     bool is_nop;
+    bool is_statement_level;
     op_category category;
     op_code code;
     op_code replace_with;

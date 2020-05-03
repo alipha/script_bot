@@ -429,7 +429,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             op_type = lookup_operation(op_code::block_start);
         }
 
-        if((op_type.category == op_category::ctrl_start || op_type.code == op_code::block_end) 
+        if(op_type.is_statement_level
                 && last_code != op_code::semicolon && last_code != op_code::block_start 
                 && last_type.category != op_category::ctrl_cond && last_type.category != op_category::ctrl_end) {
             throw std::runtime_error(token + " should be at the start of a statement"s);
