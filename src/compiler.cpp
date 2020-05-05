@@ -45,6 +45,7 @@ private:
 
     void handle_ctrl_cond(mut<operation_type> op_type_ref);
     void handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::size_t> index);
+    void handle_func_lit();
     
     bool pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<std::size_t> index);
 
@@ -188,6 +189,58 @@ void compiler_impl::handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::si
 }
 
 
+void compiler_impl::handle_func_lit(mut<std::size_t> index) {
+    auto &i = index.get();
+    std::vector<std::string_view> params;
+    
+    std::string_view token = tokens[++i];
+    if(token != "(")
+        throw std::runtime_error("Expected ( after fn. Got: "s + token);
+
+    token = tokens[++i];
+    //builders.front().append(token, op_code::none); // TODO: valid?
+    if(tokenizer::is_identifier(token))
+        params.push(token);
+    else if(token != ")")
+        throw std::runtime_error("Unexpected token "s + token + " in parameter list");
+
+    if(token != ")") {
+        while((token = tokens[++i]) == ",") {
+            // TODO: valid? for tokenized_result
+            //builders.front().append(",", op_code::none);
+            token = tokens[++i];
+            //builders.front().append(token, op_code::none); // TODO: valid?
+            if(tokenizer::is_identifier(token))
+                params.push(token);
+            else
+                throw std::runtime_error("Invalid parameter name: "s + token); 
+        }
+    }
+
+    if(token != ")")
+        throw std::runtime_error("Unexpected token "s + token + " in parameter list. Expected , or )");
+
+    if(tokens[++i] != "{")
+        throw std::runtime_error("Expected { after fn parameter list. Got: "s + token);
+
+    // TODO: is_nop?
+    builders.front().append("{", op_code::func_start);
+    op_codes.push(op_code::func_start); // TODO: operand_count == 0?
+
+    builders.emplace_front(mem, &builders, &op_codes, gen_tokenized, params);  // TODO: add params ctor
+}
+
+
+void compiler_impl::handle_func_end(mut<operation_type> op_type_ref) {
+    auto &op_type = op_type_ref.get();
+    op_type.code = op_code::func_lit;
+
+    std::vector<char> bytecode = builders.front().finalize_bytecode();
+    builders.pop_front();
+    builders.front().append_operand(bytecode);  // TODO: create function
+}
+
+
 bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<std::size_t> index) {
     auto &op_type = op_type_ref.get();
     op_code top_code;
@@ -204,6 +257,8 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
             } else if(top_op_type.code == op_code::block_start) {
                 handle_ctrl_end(op_type_ref, index);
                 //debug_out("block start " + std::to_string(in_binary_context.get()));
+            } else if(top_op_type.code == op_code::func_start) {
+                handle_func_end(op_type_ref);
             }
 
             return true;
@@ -273,6 +328,11 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
                 throw std::runtime_error("`"s + token + "` was not expected at this point.");
 
             builders.front().append_operand(token);
+            continue;
+        }
+
+        if(op_type.code == op_code::func_lit) {
+            handle_func_lit(mut(i));
             continue;
         }
 

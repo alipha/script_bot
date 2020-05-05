@@ -73,8 +73,9 @@ private:
     std::stack<op_code> *op_codes;
     bool gen_tokenized;
 
-    std::unordered_map<std::string, std::uint8_t> local_var_indexes;
-    std::unordered_map<std::string, capture_mapping> capture_indexes;
+    std::unordered_map<std::string_view, std::uint8_t> local_var_indexes;
+    std::unordered_map<std::string_view, capture_mapping> capture_indexes;
+    std::unordered_map<std::string_view, std::uint8_t> param_indexes;
 
     std::stack<std::size_t> jump_indexes;
     std::stack<std::size_t> while_indexes;
@@ -207,9 +208,11 @@ void builder_impl::append_operand(std::string_view token) {
 }
 
 
+// TODO: remove and put the appends in the ctor?
 void builder_impl::reset() {
         local_var_indexes.clear();
         capture_indexes.clear();
+        param_indexes.clear();
         jump_indexes = {};
         while_indexes = {};
         result.clear();
@@ -263,7 +266,7 @@ std::string builder_impl::parse_str_literal(std::string_view str) {
 
 std::uint8_t builder_impl::add_capture(std::string_view name, std::uint8_t parent_index) {
     std::uint8_t next_index = capture_indexes.size() + capture_index_start;
-    capture_indexes[std::string(name)] = capture_mapping{parent_index, next_index};
+    capture_indexes[name] = capture_mapping{parent_index, next_index};
     return next_index;
 }
 
@@ -296,7 +299,7 @@ std::uint8_t builder_impl::get_or_add_index(std::string_view name) {
     // if the variable doesn't exist, create it
     if(it == parents->end()) {
         std::size_t next_index = local_var_indexes.size() + 1;
-        return local_var_indexes[std::string(name)] = next_index;
+        return local_var_indexes[name] = next_index;
     }
 
     if constexpr(debug) {
@@ -315,13 +318,12 @@ std::uint8_t builder_impl::get_or_add_index(std::string_view name) {
     
 
 std::optional<std::uint8_t> builder_impl::get_my_index(std::string_view name) const {
-    std::string name_str(name);
-
-    auto it = local_var_indexes.find(name_str);
+    
+    auto it = local_var_indexes.find(name);
     if(it != local_var_indexes.end())
         return it->second;
 
-    auto capture_it = capture_indexes.find(name_str);
+    auto capture_it = capture_indexes.find(name);
     if(capture_it != capture_indexes.end())
         return capture_it->second.my_index;
 
