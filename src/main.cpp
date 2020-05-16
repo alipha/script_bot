@@ -69,6 +69,8 @@ int main(int argc, char* argv[]) {
     compiler c(&m, true);
     interpreter i(&m);
 
+    gc::set_memory_limit(100000000);
+
     if(argc > 1 && argv[1] == std::string_view("irc")) {
         std::time_t start_time = std::time(nullptr);
         int delay = 10;

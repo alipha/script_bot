@@ -1,4 +1,5 @@
 #include "debug.hpp"
+#include "gc.hpp"
 #include "memory.hpp"
 #include "object.hpp"
 
@@ -9,29 +10,12 @@
 #include <vector>
 
 
-array_ref memory::make_array() {
-    auto array = std::make_shared<std::vector<object>>();
-    arrays.push_back(array);
-    return array;
-}
-
-map_ref memory::make_map() {
-    auto map = std::make_shared<std::unordered_map<std::string, object>>();
-    maps.push_back(map);
-    return map;
-}
-
-var_ref memory::make_lvalue(object::type value) {
-    auto lvalue = std::make_shared<object>(std::move(value));
-    lvalues.push_back(lvalue);
-    return lvalue;
-}
-
 void memory::push_frame(std::size_t size) {
     for(std::size_t i = 0; i < size; i++)
         local_var_stack.push_back(make_lvalue());
     frames.push(frame(size, temps_stack.size()));
 }
+
 
 void memory::pop_frame() {
     if(debug) {
@@ -48,6 +32,7 @@ void memory::pop_frame() {
     frames.pop();
 }
 
+
 var_ref memory::get_local_var(std::size_t index) {
     if(debug) {
         if(frames.empty())
@@ -61,10 +46,5 @@ var_ref memory::get_local_var(std::size_t index) {
     }
 
     return local_var_stack[local_var_stack.size() - index];
-}
-
-
-void memory::push_temp(object temp) { 
-    temps_stack.push_back(std::move(temp)); 
 }
 

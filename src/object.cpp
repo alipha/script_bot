@@ -30,15 +30,16 @@ object::non_null_type object::non_null_value() const {
 }
 
 
-std::optional<std::string> object::to_optional_string(std::size_t depth, std::size_t *count, bool format) const {
+std::optional<gcstring> object::to_optional_string(std::size_t depth, std::size_t *count, bool format) const {
     return std::visit([=](auto &&v) { 
         return ::to_optional_string(std::forward<decltype(v)>(v), depth, count, format); 
     }, value());
 }
 
-std::string object::to_string(std::size_t depth, std::size_t *count, bool format) const {
+gcstring object::to_string(std::size_t depth, std::size_t *count, bool format) const {
     return to_optional_string(depth, count, format).value_or("null");
 }
+
 
 object::int_type object::to_int() const {
     return std::visit([](auto &&arg) -> int_type { 

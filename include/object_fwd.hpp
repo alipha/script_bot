@@ -1,8 +1,12 @@
 #ifndef LIPH_OBJECT_FWD_HPP
 #define LIPH_OBJECT_FWD_HPP
 
+#include "gc.hpp"
+#include <cstddef>
 #include <memory>
+#include <functional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -10,19 +14,37 @@
 class object;
 
 
-using string_ref = std::shared_ptr<std::string>;
-using array_ref = std::shared_ptr<std::vector<object>>;
-using map_ref = std::shared_ptr<std::unordered_map<std::string, object>>;
-using var_ref = std::shared_ptr<object>;    // a named variable (a global variable or capture, or currently, a local variable)
+using gcstring = std::basic_string<char, std::char_traits<char>, gc::allocator<char>>;
+
+
+namespace std {
+    template<>
+    struct hash<gcstring> {
+        std::size_t operator()(const gcstring &str) const {
+            return hash<std::string_view>()(std::string_view(str.data(), str.size()));
+        }
+    };
+}
+
+
+template<typename T>
+using gcvector = std::vector<T, gc::allocator<T>>;
+
+using gcmap = std::unordered_map<gcstring, object>;
+
+using string_ref = std::shared_ptr<gcstring>;
+using array_ref = gc::ptr<gcvector<object>>;
+using map_ref = gc::ptr<gcmap>;
+using var_ref = gc::ptr<object>;    // a named variable (a global variable or capture, or currently, a local variable)
 using lvalue_ref = object*;    // a pointer to an assignable object (e.g., the result of x[i]). In the future, possibly local variables.
 
 
 struct func_type {
-    std::vector<char> code;     // TODO: share the code among func_types?
-    std::vector<var_ref> captures;
+    gcvector<char> code;     // TODO: share the code among func_types?
+    gcvector<var_ref> captures;
 };
 
-using func_ref = std::shared_ptr<func_type>;
+using func_ref = gc::ptr<func_type>;
 
 
 #endif

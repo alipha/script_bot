@@ -51,9 +51,9 @@ void unary_op(object &last_value, std::stack<object> &operands, op_code code) {
         if constexpr(std::is_same_v<T, string_ref>) {
             if(code == op_code::plus) {
                 if(!v->empty() && v->front() == '-')
-                    return static_cast<std::int64_t>(std::stoll(*v));
+                    return static_cast<std::int64_t>(std::stoll(to_std_string(*v)));
                 else
-                    return static_cast<std::uint64_t>(std::stoull(*v));
+                    return static_cast<std::uint64_t>(std::stoull(to_std_string(*v)));
             } else {
                 throw std::runtime_error("String does not support: "s + lookup_operation(code).symbol);
             }

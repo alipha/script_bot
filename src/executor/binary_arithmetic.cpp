@@ -23,7 +23,7 @@ object binary_arithmetic(op_code code, const object &left, const object &right) 
     if (std::holds_alternative<string_ref>(left.value()) 
             || std::holds_alternative<string_ref>(right.value())) {
         if(code == op_code::add) {
-            return object::type(std::make_shared<std::string>(left.to_string() + right.to_string()));
+            return object::type(make_string(left.to_string() + right.to_string()));
         } else {
             throw std::runtime_error("String does not support "s + lookup_operation(code).symbol);
         }

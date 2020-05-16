@@ -1,4 +1,5 @@
 #include "conversion.hpp"
+#include "gc.hpp"
 #include "object.hpp"
 
 #include <cstddef>
@@ -7,14 +8,14 @@
 #include <sstream>
 
 
-thread_local std::stringstream ss;
+thread_local std::basic_stringstream<char, std::char_traits<char>, gc::allocator<char>> ss;
 
 
-std::optional<std::string> to_optional_string(const string_ref &s, std::size_t, std::size_t *, bool format) {
+std::optional<gcstring> to_optional_string(const string_ref &s, std::size_t, std::size_t *, bool format) {
     if(!format) 
         return {*s};
 
-    std::string result("\"");
+    gcstring result("\"");
     for(char ch : *s) {
         if(ch == '\"')
             result += "\\\"";
@@ -28,7 +29,7 @@ std::optional<std::string> to_optional_string(const string_ref &s, std::size_t, 
 }
 
 
-std::optional<std::string> to_optional_string(double v, std::size_t, std::size_t *, bool) {
+std::optional<gcstring> to_optional_string(double v, std::size_t, std::size_t *, bool) {
     ss.str("");
     ss.precision(15);
     ss << v;
@@ -36,7 +37,7 @@ std::optional<std::string> to_optional_string(double v, std::size_t, std::size_t
 }
 
 
-std::optional<std::string> to_optional_string(const array_ref &ref, std::size_t depth, std::size_t *count, bool) {
+std::optional<gcstring> to_optional_string(const array_ref &ref, std::size_t depth, std::size_t *count, bool) {
     if(ref->empty())
         return {"[]"};
     if(depth >= 20)
@@ -49,7 +50,7 @@ std::optional<std::string> to_optional_string(const array_ref &ref, std::size_t 
     if(*count > 1000)
         return "...";
 
-    std::string out("[");
+    gcstring out("[");
 
     for(const object &obj : *ref)
         out += obj.to_string(depth+1, &++*count, true) + ", ";
@@ -60,7 +61,7 @@ std::optional<std::string> to_optional_string(const array_ref &ref, std::size_t 
 }
 
 
-std::optional<std::string> to_optional_string(const map_ref &ref, std::size_t depth, std::size_t *count, bool) {
+std::optional<gcstring> to_optional_string(const map_ref &ref, std::size_t depth, std::size_t *count, bool) {
     if(ref->empty())
         return {"{}"};
     if(depth >= 20)
@@ -73,7 +74,7 @@ std::optional<std::string> to_optional_string(const map_ref &ref, std::size_t de
     if(*count > 1000)
         return "...";
                   
-    std::string out("{");
+    gcstring out("{");
 
     for(const auto &keypair : *ref)
         out += keypair.first + ": " + keypair.second.to_string(depth+1, &++*count, true) + ", ";

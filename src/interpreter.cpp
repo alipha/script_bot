@@ -2,6 +2,7 @@
 #include "debug.hpp"
 #include "conversion.hpp"
 #include "executor.hpp"
+#include "gc.hpp"
 #include "memory.hpp"
 #include "memory_buffer.hpp"
 #include "object.hpp"
@@ -148,13 +149,13 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
             operands.push(object());
             break;
         case op_code::str_lit:
-            operands.push(object(std::make_shared<std::string>(buffer.read_str())));
+            operands.push(object(make_string(buffer.read_str())));
             break;
         case op_code::array_start:
-            operands.push(object(mem->make_array()));
+            operands.push(object(make_array()));
             break;
         case op_code::map_start:
-            operands.push(object(mem->make_map()));
+            operands.push(object(make_map()));
             break;
         case op_code::array_add:
         case op_code::array_end:
@@ -195,7 +196,7 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         }
     }
     
-    std::string result = last_value.to_string();
+    std::string result = to_std_string(last_value.to_string());
     mem->pop_frame();
     return result;
 }

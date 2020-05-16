@@ -1,12 +1,14 @@
 #ifndef LIPH_OBJECT_HPP
 #define LIPH_OBJECT_HPP
 
+#include "gc.hpp"
 #include "object_fwd.hpp"
 #include "variant_util.hpp"
 
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -37,17 +39,37 @@ public:
 
     non_null_type non_null_value() const;
 
-    std::optional<std::string> to_optional_string(std::size_t depth = 0, std::size_t *count = nullptr, bool format = false) const;
+    std::optional<gcstring> to_optional_string(std::size_t depth = 0, std::size_t *count = nullptr, bool format = false) const;
 
-    std::string to_string(std::size_t depth = 0, std::size_t *count = nullptr, bool format = false) const;
+    gcstring to_string(std::size_t depth = 0, std::size_t *count = nullptr, bool format = false) const;
 
     int_type to_int() const;
 
     bool to_bool() const;
 
+
+    void transverse(gc::action &act) { act(val); }
+
 private:
     type val;
 };
+
+
+inline array_ref make_array() { return gc::make_ptr<gcvector<object>>(); }
+
+inline map_ref make_map() { return gc::make_ptr<gcmap>(); }
+
+inline var_ref make_lvalue(object::type value = std::monostate()) {
+    return gc::make_ptr<object>(std::move(value));
+}
+
+inline string_ref make_string(gcstring str) { 
+    return std::allocate_shared<gcstring>(gc::allocator<gcstring>(), std::move(str)); 
+}
+
+inline string_ref make_string(std::string_view str) {
+    return std::allocate_shared<gcstring>(gc::allocator<gcstring>(), str.begin(), str.end());
+}
 
 
 #endif
