@@ -20,12 +20,21 @@
 #ifdef DEBUG_OUT
 #include <iostream>
 
-#define debug_out(x) do { std::cerr << "DEBUG: " << x << std::endl; } while(0)
 #define debug_error(x) do { std::cerr << "ERROR: " << x << std::endl; } while(0)
 #else
-#define debug_out(x) do {} while(0)
 #define debug_error(x) do {} while(0)
 #endif
+
+
+// TODO: make collect() and iterate_from not use global temp_head
+// TODO: const correctness?
+// TODO: use allocators?
+// TODO: exception safe
+// TODO: support T[]
+// TODO: weak_ptr
+// TODO: on gc::ptr constructor, call transverse and check
+//       that all gc::ptrs that have been created are
+//       reached via transverse.
 
 
 namespace gc {
@@ -108,6 +117,11 @@ struct node;
 
 template<typename T>
 struct transverse {
+    //template<typename U = T>
+    //std::enable_if_t<detail::has_transverse_v<U> && !std::is_const_v<T>> operator()(const T &obj, action &act) { 
+    //    obj.transverse(act); 
+    //}
+
     template<typename U = T>
     std::enable_if_t<detail::has_transverse_v<U>> operator()(T &obj, action &act) { 
         obj.transverse(act); 
@@ -182,7 +196,9 @@ extern std::size_t memory_limit;
 
 void debug_not_head(node *n, node *allowed_head);
 void transverse_list(node &head, node *old_head, action &act);
+void transverse_and_mark_reachable(anchor_node &n, action &act);
 void transverse_and_mark_reachable(node *ptr, action &act);
+void transverse_and_mark_reachable(anchor_node &n);
 void transverse_and_mark_reachable(node *ptr);
 void free_delayed();
 void free_unreachable();
@@ -369,13 +385,10 @@ struct anchor_node : list_node<anchor_node> {
 
     ~anchor_node() { list_remove(); }
 
-    virtual node *detail_get_node() noexcept(!debug) { 
-#ifdef DEBUG
-        throw std::logic_error("anchor_node::detail_get_node called");
-#else
-        return nullptr; 
-#endif
-    }
+    virtual void detail_transverse(action &) {}
+    //virtual void detail_transverse(action &) const {}
+
+    virtual node *detail_get_node() const noexcept { return nullptr; } 
 };
 
 
