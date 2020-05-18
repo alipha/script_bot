@@ -281,7 +281,8 @@ void collect() {
     detail::free_unreachable();
     
     debug_out("collect: still reachable nodes: " + std::to_string(object_count())
-            + ", anchors: " + std::to_string(anchor_count()));
+            + ", anchors: " + std::to_string(anchor_count()) 
+            + ", memory used: " + std::to_string(get_memory_used()));
 }
 
 

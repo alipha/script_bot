@@ -273,10 +273,10 @@ struct apply_to_all {
 
         std::visit([&](auto &obj) {
             if constexpr(can_apply_to_all<decltype(obj), Func, Args...>(0)) {
-                debug_out("can apply");
+                //debug_out("can apply");
                 apply_to_all<Func>()(obj, args...);
             } else {
-                debug_out("CAN'T apply");
+                //debug_out("CAN'T apply");
             }
         }, v);
     }

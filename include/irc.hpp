@@ -1,6 +1,7 @@
 #ifndef LIPH_IRC_HPP
 #define LIPH_IRC_HPP
 
+#include "settings.hpp"
 #include <memory>
 #include <string>
 #include <string_view>
@@ -49,7 +50,7 @@ private:
 
 class irc_client {
 public:
-    irc_client(const std::string &settings_filename);
+    irc_client(settings &setting);
     ~irc_client();
 
     void login();

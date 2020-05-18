@@ -1,17 +1,18 @@
 #include "executor.hpp"
 #include "conversion.hpp"
 #include "debug.hpp"
+#include "gc.hpp"
 #include "object.hpp"
 #include "operation_type.hpp"
 #include "stack_util.hpp"
 #include "string_util.hpp"
 #include "variant_util.hpp"
 
-#include <stack>
 #include <string>
 #include <stdexcept>
 #include <type_traits>
 #include <variant>
+#include <vector>
 
 
 using namespace std::string_literals;
@@ -20,10 +21,11 @@ using namespace std::string_literals;
 namespace executor {
 
 
-void unary_op(object &last_value, std::stack<object> &operands, op_code code) {
+void unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, op_code code) {
     if(code == op_code::semicolon) {
         if(!operands.empty())
             last_value = pop(operands);
+        //operands.clear();   // TODO: should i do this?
         return;
     }
 
@@ -36,17 +38,17 @@ void unary_op(object &last_value, std::stack<object> &operands, op_code code) {
 
     bool is_pre = (code == op_code::pre_inc || code == op_code::pre_dec);
     bool is_post = (code == op_code::post_inc || code == op_code::post_dec);
-    object operand = is_pre ? operands.top() : pop(operands);
+    object operand = is_pre ? operands.back() : *pop(operands);
     
     if(is_post)
-        operands.push(to_variant<object::type>(operand.value()));
+        operands.push_back(to_variant<object::type>(operand.value()));
 
     if(code == op_code::logic_not) {
-        operands.push(object(static_cast<std::int64_t>(!operand.to_bool())));
+        operands.push_back(object(static_cast<std::int64_t>(!operand.to_bool())));
         return;
     }
 
-    object result = std::visit([code](auto &&v) -> object::type {
+    object result = object(std::visit([code](auto &&v) -> object::type {
         using T = std::decay_t<decltype(v)>;
         if constexpr(std::is_same_v<T, string_ref>) {
             if(code == op_code::plus) {
@@ -72,7 +74,7 @@ void unary_op(object &last_value, std::stack<object> &operands, op_code code) {
                 throw std::logic_error("Currently unsupported unary op: "s + lookup_operation(code).symbol);
             }
         }
-    }, operand.non_null_value());
+    }, operand.non_null_value()));
 
     if(is_pre || is_post) {
         if(var_ref *var = std::get_if<var_ref>(&operand.get())) {
@@ -83,7 +85,7 @@ void unary_op(object &last_value, std::stack<object> &operands, op_code code) {
             throw std::runtime_error("left of "s + lookup_operation(code).symbol + " is not assignable");
         }
     } else {
-        operands.push(result);
+        operands.push_back(std::move(result));
     }
 }
 

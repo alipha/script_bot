@@ -3,6 +3,7 @@
 #include "interpreter.hpp"
 #include "irc.hpp"
 #include "memory.hpp"
+#include "settings.hpp"
 #include "string_util.hpp"
 
 #include <chrono>
@@ -42,11 +43,12 @@ std::string run(compiler &c, interpreter &i, std::string_view code) {
 }
 
 
-void run_irc(compiler &c, interpreter &i) {
-    irc_client irc("settings.txt");
+void run_irc(settings &s, compiler &c, interpreter &i) {
+    irc_client irc(s);
     irc.login();
 
     while(true) {
+        gc::collect();
         irc_message msg = irc.read();
 
         if(msg.action() != "PRIVMSG")
@@ -65,11 +67,13 @@ void run_irc(compiler &c, interpreter &i) {
 
 
 int main(int argc, char* argv[]) {
+    settings setting("settings.txt");
     memory m;
     compiler c(&m, true);
     interpreter i(&m);
 
-    gc::set_memory_limit(100000000);
+    std::string_view max_memory = setting.first("max_memory").value_or("100000000");
+    gc::set_memory_limit(std::stoul(std::string(max_memory)));
 
     if(argc > 1 && argv[1] == std::string_view("irc")) {
         std::time_t start_time = std::time(nullptr);
@@ -77,7 +81,7 @@ int main(int argc, char* argv[]) {
         while(true) {
             try {
                 start_time = std::time(nullptr);
-                run_irc(c, i);
+                run_irc(setting, c, i);
                 return 0;
             } catch(boost::system::system_error &e) {
                 std::cerr << "boost exception: " << e.what() << std::endl;
@@ -91,6 +95,7 @@ int main(int argc, char* argv[]) {
 
     while(true) {
         try {
+            gc::collect();
             std::string line;
             std::cout << "Input: ";
             std::getline(std::cin, line);

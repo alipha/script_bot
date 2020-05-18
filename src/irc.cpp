@@ -18,8 +18,8 @@ using namespace std::string_literals;
 
 class irc_client_impl {
 public:
-    irc_client_impl(const std::string &filename) 
-        : setting(filename), context(), sock(context), sock_buf(), sock_stream(&sock_buf) {}
+    irc_client_impl(settings &s) 
+        : setting(s), context(), sock(context), sock_buf(), sock_stream(&sock_buf) {}
 
     void login();
     void write(std::string_view message);
@@ -32,7 +32,7 @@ private:
     
     std::string bot_nick() const { return std::string(setting.first("nick").value_or("LiphBot")); }
 
-    settings setting;
+    settings &setting;
     boost::asio::io_service context;
     boost::asio::ip::tcp::socket sock;
     boost::asio::streambuf sock_buf;
@@ -89,8 +89,8 @@ void irc_message::parse() {
 }
 
 
-irc_client::irc_client(const std::string &settings_filename) 
-    : impl(std::make_unique<irc_client_impl>(settings_filename)) {}
+irc_client::irc_client(settings &setting) 
+    : impl(std::make_unique<irc_client_impl>(setting)) {}
 
 irc_client::~irc_client() {}
 

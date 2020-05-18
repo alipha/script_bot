@@ -72,5 +72,16 @@ inline string_ref make_string(std::string_view str) {
 }
 
 
+
+inline gc::anchor<object> pop(std::vector<object> &v) {
+    if(debug && v.empty())
+        debug_throw("calling pop() on empty vector<object>!");
+
+    gc::anchor<object> value = std::move(v.back());
+    v.pop_back();
+    return value;
+}
+
+
 #endif
 

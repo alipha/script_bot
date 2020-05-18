@@ -20,7 +20,7 @@ namespace executor {
 object index_op(memory *mem, const object &left, const object &right) {
     bool temp = !std::holds_alternative<lvalue_ref>(left.get()) 
         && !std::holds_alternative<var_ref>(left.get()); 
-    debug_out(temp ? "temp=true" : "temp=false");
+    //debug_out(temp ? "temp=true" : "temp=false");
     if(temp)
         mem->push_temp(left);
 

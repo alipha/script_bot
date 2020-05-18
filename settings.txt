@@ -3,6 +3,10 @@ server=irc.freenode.net
 port=6667
 nick=LiphBot
 
+# approximately the max number of bytes the bot is allowed to use
+# (the below is about 100MB)
+max_memory=100000000
+
 # multiple admin= lines are allowed
 admin=Alipha
 #admin=LiphBotAdmin

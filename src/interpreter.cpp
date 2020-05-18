@@ -30,16 +30,16 @@ public:
     std::string execute(const std::vector<char> &program);
 
 private:
-    void array_add(std::stack<object> &operands);
-    void map_add(std::stack<object> &operands);
-    void execute_binary_op(std::stack<object> &operands, op_code code);
-    void execute_unary_op(std::stack<object> &operands, op_code code);
-    void execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code);
-    void execute_short_circuit(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code, bool jump_value);
-    void execute_coalesce(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code);
+    void array_add(std::vector<object> &operands);
+    void map_add(std::vector<object> &operands);
+    void execute_binary_op(std::vector<object> &operands, op_code code);
+    void execute_unary_op(std::vector<object> &operands, op_code code);
+    void execute_control_statement(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code);
+    void execute_short_circuit(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code, bool jump_value);
+    void execute_coalesce(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code);
 
     memory *mem;
-    object last_value;
+    gc::anchor<object> last_value;
 };
 
 
@@ -53,7 +53,7 @@ std::string interpreter::execute(const std::vector<char> &program) {
 }
 
 
-void interpreter_impl::execute_control_statement(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code) {
+void interpreter_impl::execute_control_statement(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code) {
     if constexpr(debug) {
         if(operands.empty()) {
             throw std::logic_error("execute_control_statement with zero operands. op_code: "s
@@ -63,12 +63,12 @@ void interpreter_impl::execute_control_statement(memory_buffer<debug> &buffer, s
 
     std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
 
-    if(!pop(operands).to_bool())
+    if(!pop(operands)->to_bool())
         buffer.seek_abs(jump_pos);
 }
 
 
-void interpreter_impl::execute_short_circuit(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code, bool jump_value) {
+void interpreter_impl::execute_short_circuit(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code, bool jump_value) {
     if constexpr(debug) {
         if(operands.empty()) {
             throw std::logic_error("execute_short_circuit with zero operands. op_code: "s
@@ -78,14 +78,14 @@ void interpreter_impl::execute_short_circuit(memory_buffer<debug> &buffer, std::
 
     std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
 
-    if(operands.top().to_bool() == jump_value)
+    if(operands.back().to_bool() == jump_value)
         buffer.seek_abs(jump_pos);
     else
-        operands.pop();
+        operands.pop_back();
 }
 
 
-void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, std::stack<object> &operands, op_code code) {
+void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code) {
     if constexpr(debug) {
         if(operands.empty()) {
             throw std::logic_error("execute_coalesce with zero operands. op_code: "s
@@ -95,19 +95,20 @@ void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, std::stack
 
     std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
 
-    if(!std::holds_alternative<std::monostate>(operands.top().value()))
+    if(!std::holds_alternative<std::monostate>(operands.back().value()))
         buffer.seek_abs(jump_pos);
     else
-        operands.pop();
+        operands.pop_back();
 }
 
 
 std::string interpreter_impl::execute(const std::vector<char> &program) {
     std::time_t start = std::time(nullptr);
     memory_buffer<debug> buffer(program);
-    std::stack<object> operands;
+    gc::anchor<std::vector<object>> operands;
     last_value = object::type(std::monostate());
 
+    mem->clear_stack();
     mem->push_frame(*buffer.read<std::uint8_t>());
     int loops = 1000;
 
@@ -123,58 +124,58 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         switch(code) { 
         case op_code::else_start:
         case op_code::while_end:
-            if(!operands.empty())
-                operands.pop();
+            if(!operands->empty())
+                operands->pop_back();
             buffer.seek_abs(*buffer.read<std::uint32_t>());
             break;
         /*case op_code::if_end:
-            if(!operands.empty())
-                operands.pop();
+            if(!operands->empty())
+                operands->pop();
             break;*/
         case op_code::global_var:
             throw std::logic_error("global_var is currently unsupported");
         case op_code::local_var:
-            operands.push(object(mem->get_local_var(*buffer.read<std::uint8_t>())));
+            operands->push_back(object(mem->get_local_var(*buffer.read<std::uint8_t>())));
             break;
         case op_code::int_lit:
-            operands.push(object(*buffer.read<std::int64_t>()));
+            operands->push_back(object(*buffer.read<std::int64_t>()));
             break;
         case op_code::uint_lit:
-            operands.push(object(*buffer.read<std::uint64_t>()));
+            operands->push_back(object(*buffer.read<std::uint64_t>()));
             break;
         case op_code::float_lit:
-            operands.push(object(*buffer.read<double>()));
+            operands->push_back(object(*buffer.read<double>()));
             break;
         case op_code::null_lit:
-            operands.push(object());
+            operands->push_back(object());
             break;
         case op_code::str_lit:
-            operands.push(object(make_string(buffer.read_str())));
+            operands->push_back(object(make_string(buffer.read_str())));
             break;
         case op_code::array_start:
-            operands.push(object(make_array()));
+            operands->push_back(object(make_array()));
             break;
         case op_code::map_start:
-            operands.push(object(make_map()));
+            operands->push_back(object(make_map()));
             break;
         case op_code::array_add:
         case op_code::array_end:
-            array_add(operands);
+            array_add(*operands);
             break;
         case op_code::map_add:
         case op_code::map_end:
-            map_add(operands);
+            map_add(*operands);
             break;
         case op_code::if_cond:
         case op_code::while_cond:
-            execute_control_statement(buffer, operands, code);
+            execute_control_statement(buffer, *operands, code);
             break;
         case op_code::logic_and:
         case op_code::logic_or:
-            execute_short_circuit(buffer, operands, code, code == op_code::logic_or);
+            execute_short_circuit(buffer, *operands, code, code == op_code::logic_or);
             break;
         case op_code::coalesce:
-            execute_coalesce(buffer, operands, code);
+            execute_coalesce(buffer, *operands, code);
             break;
         default:
             if constexpr(debug) {
@@ -183,49 +184,54 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
             }
 
             if(is_binary_op(code)) {
-                execute_binary_op(operands, code);
+                execute_binary_op(*operands, code);
             } else {
-                executor::unary_op(last_value, operands, code);
+                executor::unary_op(last_value, *operands, code);
             }
         }
     }
 
     if constexpr(debug) {
-        if(!operands.empty()) {
-            throw std::logic_error("Expected no operands in stack. size: " + std::to_string(operands.size()));
+        if(!operands->empty()) {
+            throw std::logic_error("Expected no operands in stack. size: " + std::to_string(operands->size()));
         }
     }
     
-    std::string result = to_std_string(last_value.to_string());
+    std::string result = to_std_string(last_value->to_string());
+    last_value = object();
     mem->pop_frame();
     return result;
 }
 
 
-void interpreter_impl::array_add(std::stack<object> &operands) {
+void interpreter_impl::array_add(std::vector<object> &operands) {
     if constexpr(debug) {
         if(operands.size() < 2)
             throw std::logic_error("execute array_add with " + std::to_string(operands.size()) + " operands");
     }
 
-    object element = pop(operands);
-    std::get<array_ref>(operands.top().value())->push_back(element);
+    object &array = *(operands.end() - 2);
+    std::get<array_ref>(array.value())->push_back(operands.back());
+    operands.pop_back();
 }
 
 
-void interpreter_impl::map_add(std::stack<object> &operands) {
+void interpreter_impl::map_add(std::vector<object> &operands) {
     if constexpr(debug) {
         if(operands.size() < 3)
             throw std::logic_error("execute map_add with " + std::to_string(operands.size()) + " operands");
     }
 
-    object value = pop(operands);
-    object key = pop(operands);
-    std::get<map_ref>(operands.top().value())->try_emplace(key.to_string(), value);
+    object &value = operands.back();
+    object &key = *(operands.end() - 2);
+    object &map = *(operands.end() - 3);
+    std::get<map_ref>(map.value())->try_emplace(key.to_string(), value);
+    operands.pop_back();
+    operands.pop_back();
 }
 
 
-void interpreter_impl::execute_binary_op(std::stack<object> &operands, op_code code) {
+void interpreter_impl::execute_binary_op(std::vector<object> &operands, op_code code) {
     if constexpr(debug) {
         if(operands.size() < 2) {
             throw std::logic_error("execute_binary_op with " + std::to_string(operands.size()) 
@@ -234,8 +240,9 @@ void interpreter_impl::execute_binary_op(std::stack<object> &operands, op_code c
     }
 
     bool is_assign = is_binary_assignment(code);
-    object right = pop(operands);
-    object left = is_assign ? operands.top() : pop(operands);
+    // TODO: only use anchors when the op is something that allocates memory?
+    gc::anchor<object> right = pop(operands);
+    gc::anchor<object> left = is_assign ? gc::anchor<object>(operands.back()) : pop(operands);
     object result;
 
     if(is_assign && code != op_code::assign) {
@@ -243,28 +250,28 @@ void interpreter_impl::execute_binary_op(std::stack<object> &operands, op_code c
     }
 
     if(code == op_code::assign)
-        result = right;
+        result = *right;
     else if(code == op_code::index)
-        result = executor::index_op(mem, left, right);
+        result = executor::index_op(mem, *left, *right);
     else if(is_binary_comp(code))
-        result = static_cast<std::int64_t>(executor::binary_comp(code, left, right));
+        result = object::type(static_cast<std::int64_t>(executor::binary_comp(code, *left, *right)));
     else if(is_binary_int_op(code))
-        result = executor::binary_int_op(code, left, right);
+        result = executor::binary_int_op(code, *left, *right);
     else if(is_binary_arithmetic(code))
-        result = executor::binary_arithmetic(code, left, right);
+        result = executor::binary_arithmetic(code, *left, *right);
     else
         throw std::logic_error("currently unspported binary op: "s + lookup_operation(code).symbol);
 
     if(is_assign) {
-        if(var_ref *var = std::get_if<var_ref>(&left.get())) {
+        if(var_ref *var = std::get_if<var_ref>(&left->get())) {
             **var = to_variant<object::type>(result.value());
-        } else if(lvalue_ref *lvalue = std::get_if<lvalue_ref>(&left.get())) {
+        } else if(lvalue_ref *lvalue = std::get_if<lvalue_ref>(&left->get())) {
             **lvalue = to_variant<object::type>(result.value()); 
         } else {
             throw std::runtime_error("left of "s + lookup_operation(code).symbol + " is not assignable");
         }
     } else {
-        operands.push(result);
+        operands.push_back(std::move(result));
     }
 }
 
