@@ -6,8 +6,6 @@
 #include <new>
 #include <typeinfo>
 
-#include <iostream>
-
 
 namespace gc {
  
@@ -116,72 +114,40 @@ private:
 };
 
 
-inline void print(const char *where, detail::node *n, detail::node *other_n = nullptr) {
-    std::cout << where << ": ";
-    if(n)
-        std::cout << (void*)n << ", count= " << n->ref_count;
-    else
-        std::cout << "null";
-    if(other_n)
-        std::cout << ", other= " << (void*)other_n << ", count= " << other_n->ref_count;
-    std::cout << std::endl;
-}
-
 template<typename T>
 class ptr {
 public:
     using element_type = T;
 
-    ptr() noexcept : n(nullptr), p(nullptr) { print("ptr()", n); }
-    ptr(std::nullptr_t) noexcept : n(nullptr), p(nullptr) { print("ptr(nullptr_t)", n); }
+    ptr() noexcept : n(nullptr), p(nullptr) {}
+    ptr(std::nullptr_t) noexcept : n(nullptr), p(nullptr)  {}
 
     template<typename... Args>
     explicit ptr(std::in_place_t, Args&&... args) : n(nullptr), p(nullptr) {
         detail::object<T> *obj = create_object(std::forward<Args>(args)...);
         n = obj;
         p = &obj->value;
-        print("in_place", n);
-        if(n && n->ref_count == 0)
-            debug_error("in_place_t: ref_count == 0");
     }
 
-    ptr(const ptr &other) noexcept : n(other.n), p(other.p) { 
-        print("ptr(const ptr &)", n);
-        if(n && n->ref_count == 0)
-            debug_error("const ptr &: ref_count == 0");
-        if(n) ++n->ref_count; 
-    }
+    ptr(const ptr &other) noexcept : n(other.n), p(other.p) { if(n) ++n->ref_count; }
 
     ptr(ptr &&other) noexcept : n(other.n), p(other.p) { 
-        print("ptr(ptr &&)", n);
-        if(n && n->ref_count == 0)
-            debug_error("ptr &&: ref_count == 0");
         other.n = nullptr;
         other.p = nullptr;
     }
 
     template<typename U>
     ptr(ptr<U> other) noexcept : n(other.n), p(other.p) {
-        print("ptr(ptr<U>)", n);
-        if(n && n->ref_count == 0)
-            debug_error("ptr<U>: ref_count == 0");
         other.n = nullptr;
         other.p = nullptr;
     }
 
     ptr &operator=(std::nullptr_t) {
-        print("operator=(nullptr_t)", n);
         reset();
         return *this;
     }
 
     ptr &operator=(const ptr &other) {
-        print("operator=(const ptr &)", n, other.n);
-        if(n && n->ref_count == 0)
-            debug_error("op=(const ptr &): ref_count == 0");
-        if(other.n && other.n->ref_count == 0)
-            debug_error("op=(const ptr &): other.ref_count == 0");
-
         if(other.n)
             ++other.n->ref_count;
         reset();
@@ -191,12 +157,6 @@ public:
     }
 
     ptr &operator=(ptr &&other) {
-        print("operator=(ptr &&)", n, other.n);
-        if(n && n->ref_count == 0)
-            debug_error("op=(ptr &&): ref_count == 0");
-        if(other.n && other.n->ref_count == 0)
-            debug_error("op=(ptr &&): other.ref_count == 0");
-
         reset();
         n = other.n;
         p = other.p;
@@ -207,12 +167,6 @@ public:
 
     template<typename U>
     ptr &operator=(ptr<U> other) {
-        print("operator=(ptr<U>)", n, other.n);
-        if(n && n->ref_count == 0)
-            debug_error("op=(ptr<U>): ref_count == 0");
-        if(other.n && other.n->ref_count == 0)
-            debug_error("op=(ptr<U>): other.ref_count == 0");
-
         reset();
         n = other.n;
         p = other.p;
@@ -221,7 +175,7 @@ public:
         return *this;
     }
 
-    ~ptr() { print("~ptr()", n); reset(); }
+    ~ptr() { reset(); }
 
     explicit operator bool() const noexcept { return p; }
 
@@ -239,14 +193,13 @@ public:
     std::size_t use_count() const noexcept { return n ? n->ref_count : 0; }
 
     void swap(ptr &other) noexcept {
-        print("swap", n, other.n);
         std::swap(n, other.n);
         std::swap(p, other.p);
     }
 
     void reset() {
         if(n && !detail::is_running && --n->ref_count == 0)
-            n->free();      // TODO: figure out why freeing doesn't work
+            n->free();
         n = nullptr;
         p = nullptr;
     }
@@ -421,7 +374,7 @@ public:
     //}
 
 private:
-    template<typename... Types>
+    template<typename... Types>  // TODO
     friend struct for_types;
 
     T value;

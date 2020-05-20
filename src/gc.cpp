@@ -193,26 +193,24 @@ void delete_list(node &head) {
     while(next != &head) {
         debug_not_head(next, nullptr);
         next->before_destroy();
-//        if(debug && &head == &active_head)   // BAD
-//            next->transverse(dec_action);
+        if(debug && &head == &active_head)
+            next->transverse(dec_action);
         next = next->next;
     }
 
     next = head.next;
 
-    debug_out("deleting list");
+    //debug_out("deleting list");
     while(next != &head) {
-        debug_out("deleting...");
         debug_not_head(next, nullptr);
-//        if(debug && next->ref_count != 0)
-//            debug_error("delete_list ref_count = " + std::to_string(next->ref_count));
+        if(debug && next->ref_count != 0)
+            debug_error("delete_list ref_count = " + std::to_string(next->ref_count));
 
         node *current = next;
         next = next->next;
         memory_used -= current->get_memory_used();
         delete current;
     }
-    debug_out("done deleting");
 }
 
 
@@ -239,10 +237,8 @@ bool node::mark_reachable(bool update_ref_count) {
         return false;
     }
 
-    if(update_ref_count) {
-        //prev_ref_count = ref_count;
+    if(update_ref_count)
         ref_count = 1;
-    }
     reachable = true;
     list_remove();
     list_insert(temp_head);
@@ -252,16 +248,6 @@ bool node::mark_reachable(bool update_ref_count) {
 
 void node::free() {
     is_running = true;
-    debug_out("freeing node");
-//active_head.next[5].ref_count = 5;
-//delete active_head.next;
-//delete active_head.next;
-    if(debug) {
-        if(detail::temp_head.next != &detail::temp_head)
-            debug_error("free: temp list is not empty");
-        if(detail::temp_head.prev != &detail::temp_head)
-            debug_error("free: temp_head.prev != head");
-    }
 
     if(debug && ref_count != 0)
         throw std::logic_error("free: refcount is not 0!");
@@ -276,43 +262,9 @@ void node::free() {
 
 
 
-void validate_counts() {
-    detail::node *next = detail::active_head.next;
-
-    while(next != &detail::active_head) {
-        next->prev_ref_count = next->ref_count;
-        next->ref_count = 0;
-        next = next->next;
-    }
-
-    if(debug) {
-        if(detail::temp_head.next != &detail::temp_head)
-            debug_error("validate_counts: temp list is not empty");
-        if(detail::temp_head.prev != &detail::temp_head)
-            debug_error("validate_counts: temp_head.prev != head");
-    }
-
-    collect(false);
-    debug_out("validating ref counts");
-    next = detail::active_head.next;
-
-    while(next != &detail::active_head) {
-        debug_out("validating...");
-        if(next->prev_ref_count != next->ref_count)
-            debug_error("prev_ref_count: " + std::to_string(next->prev_ref_count)
-                    + ", ref_count: " + std::to_string(next->ref_count));
-        next->prev_ref_count = next->ref_count;
-        next = next->next;
-    }
-
-    debug_out("done validating");
-}
-
-
-void collect(bool validate) {
+void collect() {
     detail::mark_reachable_action act;
     detail::anchor_node *node = detail::anchor_head.next;
-    //node[5].detail_get_node();
 
     debug_out("collect: marking reachable nodes: " + std::to_string(object_count())
             + ", anchors: " + std::to_string(anchor_count()));
@@ -325,22 +277,12 @@ void collect(bool validate) {
         node = node->next;
     }
 
-    if(debug && !validate) {
-        if(detail::active_head.next != &detail::active_head)
-            debug_error("validate_counts: active list is not empty");
-        if(detail::active_head.prev != &detail::active_head)
-            debug_error("validate_counts: active_head.prev != head");
-    }
-
     //debug_out("collect: freeing unreachables");
     detail::free_unreachable();
     
     debug_out("collect: still reachable nodes: " + std::to_string(object_count())
             + ", anchors: " + std::to_string(anchor_count()) 
             + ", memory used: " + std::to_string(get_memory_used()));
-
-    if(debug && validate)
-        validate_counts();
 }
 
 
