@@ -48,7 +48,6 @@ void run_irc(settings &s, compiler &c, interpreter &i) {
     irc.login();
 
     while(true) {
-        gc::collect();
         irc_message msg = irc.read();
 
         if(msg.action() != "PRIVMSG")
@@ -61,6 +60,9 @@ void run_irc(settings &s, compiler &c, interpreter &i) {
         } else if(starts_with(msg.message(), "!calc ")) {
             irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": " + 
                     run(c, i, msg.message().substr(6)));
+            std::size_t mem_used = gc::get_memory_used();
+            if(mem_used > 0)
+                std::cout << "Memory Used: " << mem_used << std::endl;
         }
     }
 }
@@ -95,7 +97,7 @@ int main(int argc, char* argv[]) {
 
     while(true) {
         try {
-            gc::collect();
+            //gc::collect();
             std::string line;
             std::cout << "Input: ";
             std::getline(std::cin, line);

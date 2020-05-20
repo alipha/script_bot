@@ -38,7 +38,7 @@ build:
 	@mkdir -p $(OBJ_DIR)
 	@mkdir -p $(DEP_DIR)
 
-debug: CXXFLAGS += -DDEBUG -DDEBUG_OUT -g -D_GLIBCXX_DEBUG -ggdb -fno-omit-frame-pointer -fsanitize=undefined -fsanitize=address -fsanitize=leak
+debug: CXXFLAGS += -DDEBUG -DDEBUG_OUT -O0 -g -D_GLIBCXX_DEBUG -ggdb -fno-omit-frame-pointer -fsanitize=undefined -fsanitize=address -fsanitize=leak
 debug: all
 
 release: CXXFLAGS += -O2

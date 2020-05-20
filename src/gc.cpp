@@ -50,15 +50,15 @@ struct mark_reachable_action : action {
     }
 };
 
-// for debug only
+
 struct dec_ref_action : action {
     bool detail_perform(detail::node *node) override { 
-        if(!node)
+        if(debug && !node)
             throw std::logic_error("dec_ref_action: null");
-        if(node->ref_count == 0)
+        if(debug && node->ref_count == 0)
             debug_error("dec_ref_action: ref_count is 0");
-        else
-            --node->ref_count;
+        
+        --node->ref_count;
         return true;
     } 
 };
@@ -140,7 +140,7 @@ void free_delayed() {
 	node *old_head = &temp_head;
     transverse_list(temp_head, old_head, act);
 
-	delete_list(temp_head);
+	delete_list(temp_head, false);
     temp_head.next = &temp_head;
     temp_head.prev = &temp_head;
 }
@@ -148,11 +148,11 @@ void free_delayed() {
 
 void free_unreachable() {
     is_running = true;
-    delete_list(active_head);
+    delete_list(active_head, true);
     is_running = false;
 
     if(temp_head.next != &temp_head) {
-        debug_out("still reachable nodes");
+        //debug_out("still reachable nodes");
         active_head.next = temp_head.next;
         active_head.prev = temp_head.prev;
         active_head.next->prev = &active_head;
@@ -163,7 +163,7 @@ void free_unreachable() {
         temp_head.next = &temp_head;
         temp_head.prev = &temp_head;
     } else {
-        debug_out("no reachable nodes");
+        //debug_out("no reachable nodes");
         active_head.next = &active_head;
         active_head.prev = &active_head;
     }
@@ -185,7 +185,7 @@ void reset_reachable_flag(node &head) {
 }
 
 
-void delete_list(node &head) {
+void delete_list(node &head, bool dec_counts) {
     dec_ref_action dec_action;
     node *next = head.next;
 
@@ -193,7 +193,7 @@ void delete_list(node &head) {
     while(next != &head) {
         debug_not_head(next, nullptr);
         next->before_destroy();
-        if(debug && &head == &active_head)
+        if(dec_counts)
             next->transverse(dec_action);
         next = next->next;
     }
@@ -230,15 +230,10 @@ void move_temp_to_active() {
 }
 
 
-bool node::mark_reachable(bool update_ref_count) {
-    if(reachable) {
-        if(update_ref_count)
-            ++ref_count;
+bool node::mark_reachable() {
+    if(reachable)
         return false;
-    }
 
-    if(update_ref_count)
-        ref_count = 1;
     reachable = true;
     list_remove();
     list_insert(temp_head);
@@ -267,7 +262,8 @@ void collect() {
     detail::anchor_node *node = detail::anchor_head.next;
 
     debug_out("collect: marking reachable nodes: " + std::to_string(object_count())
-            + ", anchors: " + std::to_string(anchor_count()));
+            + ", anchors: " + std::to_string(anchor_count())
+            + ", memory used: " + std::to_string(detail::memory_used));
 
     while(node != &detail::anchor_head) {
         if(detail::node *n = node->detail_get_node())
@@ -281,8 +277,8 @@ void collect() {
     detail::free_unreachable();
     
     debug_out("collect: still reachable nodes: " + std::to_string(object_count())
-            + ", anchors: " + std::to_string(anchor_count()) 
-            + ", memory used: " + std::to_string(get_memory_used()));
+            + ", anchors: " + std::to_string(anchor_count())
+            + ", memory used: " + std::to_string(detail::memory_used));
 }
 
 
