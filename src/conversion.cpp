@@ -51,10 +51,13 @@ std::optional<gcstring> to_optional_string(const array_ref &ref, std::size_t dep
         return "...";
 
     gcstring out("[");
-
+try {
     for(const object &obj : *ref)
         out += obj.to_string(depth+1, &++*count, true) + ", ";
-
+} catch(...) {
+    debug_out("to_optional_string(array_ref): is throwing");
+    throw;
+}
     out.pop_back();
     out.back() = ']';
     return {std::move(out)};

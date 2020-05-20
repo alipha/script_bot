@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
 
     while(true) {
         try {
-            gc::collect();
+            //gc::collect();
             std::string line;
             std::cout << "Input: ";
             std::getline(std::cin, line);

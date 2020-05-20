@@ -9,7 +9,7 @@
 
 
 object::value_type object::value() const {
-    return std::visit([](auto &&v) -> value_type {
+    return std::visit([](auto &v) -> value_type {
         using T = std::decay_t<decltype(v)>;
         if constexpr(std::is_same_v<T, var_ref> || std::is_same_v<T, lvalue_ref>)
             return v->value();
@@ -20,20 +20,29 @@ object::value_type object::value() const {
 
 
 object::non_null_type object::non_null_value() const {
-    return std::visit([](auto &&v) -> non_null_type {
+    gc::anchor<value_type> val_type = value();
+
+    return std::visit([](auto &v) -> non_null_type {
         using T = std::decay_t<decltype(v)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             throw std::runtime_error("unexpected null value");
         else
-            return std::forward<T>(v);
-    }, value());
+            return v;
+    }, *val_type);
 }
 
 
 std::optional<gcstring> object::to_optional_string(std::size_t depth, std::size_t *count, bool format) const {
-    return std::visit([=](auto &&v) { 
-        return ::to_optional_string(std::forward<decltype(v)>(v), depth, count, format); 
-    }, value());
+    gc::anchor<value_type> val_type = value();
+
+    return std::visit([=](auto &v) { 
+try {
+        return ::to_optional_string(v, depth, count, format); 
+} catch(...) {
+    debug_out("object::to_optional_string: is throwing");
+    throw;
+}
+    }, *val_type);
 }
 
 gcstring object::to_string(std::size_t depth, std::size_t *count, bool format) const {

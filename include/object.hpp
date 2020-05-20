@@ -60,7 +60,9 @@ inline array_ref make_array() { return gc::make_ptr<gcvector<object>>(); }
 inline map_ref make_map() { return gc::make_ptr<gcmap>(); }
 
 inline var_ref make_lvalue(object::type value = std::monostate()) {
-    return gc::make_ptr<object>(std::move(value));
+    auto p = gc::make_ptr<object>();
+    *p = object(std::move(value));
+    return p;
 }
 
 inline string_ref make_string(gcstring str) { 

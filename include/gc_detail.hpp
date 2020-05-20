@@ -41,7 +41,7 @@ namespace gc {
 
 
 extern bool run_on_bad_alloc;
-void collect();
+void collect(bool validate = true);
 
 
 template<typename T>
@@ -124,6 +124,7 @@ struct transverse {
 
     template<typename U = T>
     std::enable_if_t<detail::has_transverse_v<U>> operator()(T &obj, action &act) { 
+        debug_out("obj.transverse");
         obj.transverse(act); 
     }
 };
@@ -150,7 +151,7 @@ struct transverse<T&&> : transverse<T> {};
 
 template<typename T>
 struct transverse<ptr<T>> {
-    void operator()(ptr<T> &p, action &act) { act(p); }
+    void operator()(ptr<T> &p, action &act) { debug_out("transverse<ptr<T>>"); act(p); }
 };
 
 
@@ -262,8 +263,12 @@ struct apply_to_all {
 
     template<typename T, typename... Args>
     std::enable_if_t<detail::is_container_v<T>> operator()(T &container, Args&&... args) {
-        for(auto &obj : container)
+        if(debug && container.size() == 0)
+            debug_out("container size: 0");
+        for(auto &obj : container) {
+            debug_out("container loop: " + std::to_string(container.size()));
             apply_to_all<Func>()(obj, std::forward<Args>(args)...);
+        }
     }
 
     template<typename... Ts, typename... Args>
@@ -273,7 +278,7 @@ struct apply_to_all {
 
         std::visit([&](auto &obj) {
             if constexpr(can_apply_to_all<decltype(obj), Func, Args...>(0)) {
-                //debug_out("can apply");
+                debug_out("can apply");
                 apply_to_all<Func>()(obj, args...);
             } else {
                 //debug_out("CAN'T apply");
@@ -359,6 +364,7 @@ struct node : list_node<node> {
     void free();
 
     std::size_t ref_count = 1;
+    std::size_t prev_ref_count = ~0;
     bool reachable = false;
 };
 
@@ -397,6 +403,8 @@ template<typename T>
 struct creation_tracker {
     creation_tracker() : has_reset(false) { 
         ++nested_create_count;
+        if(nested_create_count > 1)
+            debug_out("nested_create_count: " + std::to_string(nested_create_count));
         memory_used += get_memory_used_for<T>(); 
     }
     
@@ -441,12 +449,15 @@ object<T> *create_object(Args&&... args) {
 
         if(run_on_bad_alloc && !is_retrying) {
             node->list_insert(nested_create_count > 1 ? temp_head : active_head);
-            if(nested_create_count == 1) {
-                move_temp_to_active();
-            }
         } else {
             debug_out("inserting directly to active");
             node->list_insert(active_head);
+        }
+
+        if(nested_create_count == 1) {
+            if(debug && temp_head.next != &temp_head)
+                debug_out("create_object: temp_head.next != &temp_head");
+            move_temp_to_active();
         }
 
         memory_used += get_memory_used_for<T>();
@@ -478,6 +489,9 @@ T *allocate(std::size_t n, bool retry) {
             collect();
             return allocate<T>(n, false);
         } else {
+            debug_out("allocator: throwing");
+//delete active_head.next;
+//delete active_head.next;
             throw memory_limit_exceeded();
         }
     }

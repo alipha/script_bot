@@ -113,6 +113,7 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
     int loops = 1000;
 
     while(buffer.position() < buffer.size()) {
+        //gc::collect();
         if(--loops == 0) {
             if(std::time(nullptr) - start > 30)
                 throw std::runtime_error("Execution terminated after 30 seconds");
@@ -120,7 +121,11 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         }
 
         op_code code = *buffer.read<op_code>();
-      
+        if(code < op_code::count)
+            debug_out("running: "s + lookup_operation(code).symbol); 
+        else
+            debug_out("running: "s + std::to_string(static_cast<int>(code)));
+
         switch(code) { 
         case op_code::else_start:
         case op_code::while_end:
@@ -196,11 +201,19 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
             throw std::logic_error("Expected no operands in stack. size: " + std::to_string(operands->size()));
         }
     }
-    
-    std::string result = to_std_string(last_value->to_string());
-    last_value = object();
-    mem->pop_frame();
-    return result;
+   
+    debug_out("temps_stack: " + std::to_string(mem->temps_stack->size()));
+    debug_out("local_vars:  " + std::to_string(mem->local_var_stack->size()));
+    debug_out("globals:     " + std::to_string(mem->globals->size()));
+    try {
+        std::string result = to_std_string(last_value->to_string());
+        last_value = object();
+        mem->pop_frame();
+        return result;
+    } catch(...) {
+        debug_out("execute: is throwing");
+        throw;
+    }
 }
 
 
@@ -209,9 +222,10 @@ void interpreter_impl::array_add(std::vector<object> &operands) {
         if(operands.size() < 2)
             throw std::logic_error("execute array_add with " + std::to_string(operands.size()) + " operands");
     }
-
+    
     object &array = *(operands.end() - 2);
-    std::get<array_ref>(array.value())->push_back(operands.back());
+    auto arr_ref = array.value();
+    std::get<array_ref>(arr_ref)->push_back(operands.back());
     operands.pop_back();
 }
 

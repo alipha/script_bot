@@ -29,7 +29,8 @@ public:
 
     void push_temp(object temp) { temps_stack->push_back(std::move(temp)); }
 
-private:
+    // TODO: make private
+//private:
     gc::anchor<std::unordered_map<std::string, var_ref>> globals;
     gc::anchor<std::vector<object>> temps_stack;
     gc::anchor<std::vector<var_ref>> local_var_stack;
