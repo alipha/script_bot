@@ -84,29 +84,30 @@ enum class op_code : std::uint8_t {
     index_end,
     array_end,   // 40
     block_start,
+    func_start,
     map_start,
+    func_end,   // 44
     block_end,
-    map_end,     // 44
+    map_end,
     if_start,
-    if_cond,
+    if_cond,     // 48
     if_end,
-    else_start,  // 48
+    else_start,
     else_end,
-    while_start,
+    while_start, // 4c
     while_cond,
-    while_end,   // 4c
+    while_end,
     func_lit,
-    ret,
+    ret,         // 50
     count,
 
-    global_var,  // 50
+    global_var,
     local_var,
-    param_var,
-    int_lit,
-    uint_lit,    // 54
+    int_lit,     // 54
+    uint_lit,
     float_lit,
     str_lit,
-    null_lit     // 57
+    null_lit     // 58
 };
 
 

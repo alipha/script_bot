@@ -18,6 +18,8 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 using namespace std::string_literals;
 
@@ -35,12 +37,12 @@ struct capture_mapping {
 
 class builder_impl {
 public:
-    builder_impl(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes_ptr, bool generate_tokenized) 
+    builder_impl(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes_ptr, bool generate_tokenized, const std::vector<std::string_view> &params) 
         : mem(m), 
           parents(builders), 
           op_codes(op_codes_ptr), 
           gen_tokenized(generate_tokenized)
-    { reset(); }
+    { reset(params); }
     
     // non-movable because the parents pointer will probably end up pointing to the wrong one
     builder_impl(const builder_impl &) = delete;
@@ -48,14 +50,24 @@ public:
     builder_impl &operator=(const builder_impl &) = delete;
     builder_impl &operator=(builder_impl &&) = delete;
 
-    void append(std::string_view token, op_code code) { append(token, lookup_operation(op_code::none), code); }
-    void append(std::string_view token, const operation_type &op_type) { append(token, op_type, op_type.code); }
-    void append(std::string_view token, const operation_type &op_type, op_code code);
+    void append(std::string_view token, op_code code) {
+        append(token, lookup_operation(op_code::none), code); 
+    }
+    void append(std::string_view token, const operation_type &op_type) { 
+        append(token, op_type, op_type.code);
+    }
+    void append(std::string_view token, const operation_type &op_type, op_code code) {
+        append(token, op_type, code, std::string_view());
+    }
+    void append(std::string_view token, const operation_type &op_type, op_code code, std::string_view func_tokens);
+
+
     void append_operand(std::string_view token);
+    void append_operand(const std::vector<char> &bytecode, const std::string &func_tokens);
 
     const std::string &tokenized() const { return tokenized_result; }
 
-    void reset();
+    void reset(const std::vector<std::string_view> &params);
     
     std::vector<char> finalize_bytecode();
 
@@ -75,7 +87,6 @@ private:
 
     std::unordered_map<std::string_view, std::uint8_t> local_var_indexes;
     std::unordered_map<std::string_view, capture_mapping> capture_indexes;
-    std::unordered_map<std::string_view, std::uint8_t> param_indexes;
 
     std::stack<std::size_t> jump_indexes;
     std::stack<std::size_t> while_indexes;
@@ -86,8 +97,8 @@ private:
 
 
 
-bytecode_builder::bytecode_builder(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes, bool generate_tokenized)
-    : impl(std::make_unique<builder_impl>(m, builders, op_codes, generate_tokenized)) {}
+bytecode_builder::bytecode_builder(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes, bool generate_tokenized, const std::vector<std::string_view> &params)
+    : impl(std::make_unique<builder_impl>(m, builders, op_codes, generate_tokenized, params)) {}
 
 bytecode_builder::~bytecode_builder() {}
 
@@ -103,9 +114,15 @@ void bytecode_builder::append(std::string_view token, const operation_type &op_t
     impl->append(token, op_type, code);
 }
 
-void bytecode_builder::append_operand(std::string_view token) { impl->append_operand(token); }
+void bytecode_builder::append_operand(std::string_view token) {
+    impl->append_operand(token);
+}
+    
+void bytecode_builder::append_operand(const std::vector<char> &bytecode, const std::string &func_tokens) {
+    impl->append_operand(bytecode, func_tokens); 
+}
 
-void bytecode_builder::reset() { impl->reset(); }
+void bytecode_builder::reset(const std::vector<std::string_view> &params) { impl->reset(params); }
 
 const std::string &bytecode_builder::tokenized() const { return impl->tokenized(); }
 
@@ -113,9 +130,12 @@ std::vector<char> bytecode_builder::finalize_bytecode() { return impl->finalize_
 
 
 
-void builder_impl::append(std::string_view token, const operation_type &op_type, op_code code) {
+void builder_impl::append(std::string_view token, const operation_type &op_type, op_code code, std::string_view func_tokens) {
     if(gen_tokenized) {
-        tokenized_result += token;
+        if(code == op_code::func_lit)
+            tokenized_result += func_tokens;
+        else
+            tokenized_result += token;
         tokenized_result += " ";
     }
 
@@ -173,14 +193,16 @@ void builder_impl::append(std::string_view token, const operation_type &op_type,
         result.append(get_or_add_index(token));
         break;
     case op_code::int_lit:
-        result.append(static_cast<int64_t>(std::stoll(std::string(token))));  // TODO: from_chars?
+        result.append(static_cast<std::int64_t>(std::stoll(std::string(token))));  // TODO: from_chars?
         break;
     case op_code::uint_lit:
-        result.append(static_cast<uint64_t>(std::stoull(std::string(token))));  // TODO: from_chars?
+        result.append(static_cast<std::uint64_t>(std::stoull(std::string(token))));  // TODO: from_chars?
         break;
     case op_code::float_lit:
         result.append(std::stod(std::string(token)));
         break;
+    case op_code::func_lit:
+        result.append(token);
     default:
         ; //throw std::logic_error(token + " is currently not supported"s);
     }
@@ -208,18 +230,27 @@ void builder_impl::append_operand(std::string_view token) {
 }
 
 
+void builder_impl::append_operand(const std::vector<char> &bytecode, const std::string &func_tokens) {
+    append(std::string_view(bytecode.data(), bytecode.size()), lookup_operation(op_code::none), op_code::func_lit, func_tokens);
+}
+
+
 // TODO: remove and put the appends in the ctor?
-void builder_impl::reset() {
+void builder_impl::reset(const std::vector<std::string_view> &params) {
         local_var_indexes.clear();
         capture_indexes.clear();
-        param_indexes.clear();
         jump_indexes = {};
         while_indexes = {};
         result.clear();
         tokenized_result.clear();
 
+        result.append(static_cast<std::uint8_t>(params.size()));
         result.append(static_cast<std::uint8_t>(0));
         result.append(static_cast<std::uint8_t>(0));
+
+        std::uint8_t index = 0;
+        for(std::string_view param : params)
+            local_var_indexes[param] = ++index;
 }
 
 
@@ -238,8 +269,8 @@ std::vector<char> builder_impl::finalize_bytecode() {
     for(auto &capture : capture_indexes)
         result.patch(capture_start + capture.second.my_index - capture_index_start, capture.second.parent_index);
 
-    result.patch(0, static_cast<std::uint8_t>(local_var_count));
-    result.patch(1, static_cast<std::uint8_t>(capture_count));
+    result.patch(1, static_cast<std::uint8_t>(local_var_count));
+    result.patch(2, static_cast<std::uint8_t>(capture_count));
     return std::move(result).buffer();
 }
 
@@ -280,7 +311,7 @@ std::uint8_t builder_impl::get_or_add_index(std::string_view name) {
 
     // find this builder in the builder list so that we're only looking at
     // builder parents and not builder children
-    // (thouigh I think *this would always be the front() builder...)
+    // (though I think *this would always be the front() builder...)
     auto this_it = std::find_if(parents->begin(), parents->end(), 
             [this](auto &parent) { return parent.impl.get() == this; });
 

@@ -109,6 +109,9 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
     last_value = object::type(std::monostate());
 
     mem->clear_stack();
+    // TODO: params
+    std::uint8_t param_count = *buffer.read<std::uint8_t>();
+    (void)param_count;
     mem->push_frame(*buffer.read<std::uint8_t>());
     
     std::uint8_t capture_count = *buffer.read<std::uint8_t>();

@@ -90,7 +90,9 @@ operation_type operation_types[] = {
     {"]",     true,  true,  1, assoc::left,  900, true,  false, cat::other,      code::index_end,    code::none,         true,  false, code::none,         code::none},
     {"]",     true,  true,  1, assoc::left,    0, false, false, cat::other,      code::array_end,    code::none,         true,  false, code::none,         code::none},
     {"{",     false, false, 0, assoc::right,   0, true,  false, cat::other,      code::block_start,  code::none,         false, true,  code::block_end,    code::none},  // removed code::map_end as other
+    {"{",     false, false, 0, assoc::right,   0, true,  false, cat::other,      code::func_start,   code::none,         false, true,  code::func_end,     code::block_end},
     {"{",     false, false, 0, assoc::right,   0, false, false, cat::other,      code::map_start,    code::none,         false, true,  code::map_end,      code::block_end},
+    {"}",     false, false, 1, assoc::left,    0, true,  true,  cat::other,      code::func_end,     code::none,         true,  false, code::none,         code::none},
     {"}",     false, false, 1, assoc::left,    0, true,  true,  cat::other,      code::block_end,    code::none,         true,  false, code::none,         code::none},
     {"}",     true,  true,  1, assoc::left,    0, false, false, cat::other,      code::map_end,      code::none,         true,  false, code::none,         code::none},
     {"if" ,   false, false, 1, assoc::left,   50, true,  true,  cat::ctrl_start, code::if_start,     code::if_cond,      false, false, code::none,         code::none},

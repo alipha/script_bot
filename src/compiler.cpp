@@ -4,6 +4,7 @@
 #include "operation_type.hpp"
 #include "stack_util.hpp"
 #include "string_util.hpp"
+#include "tokenizer.hpp"
 #include "util.hpp"
 
 #include <cstring>
@@ -45,7 +46,8 @@ private:
 
     void handle_ctrl_cond(mut<operation_type> op_type_ref);
     void handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::size_t> index);
-    void handle_func_lit();
+    void handle_func_lit(mut<std::size_t> index);
+    void handle_func_end(mut<operation_type> op_type_ref);
     
     bool pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<std::size_t> index);
 
@@ -199,8 +201,8 @@ void compiler_impl::handle_func_lit(mut<std::size_t> index) {
 
     token = tokens[++i];
     //builders.front().append(token, op_code::none); // TODO: valid?
-    if(tokenizer::is_identifier(token))
-        params.push(token);
+    if(tokenizer::is_identifier(token[0]))
+        params.push_back(token);
     else if(token != ")")
         throw std::runtime_error("Unexpected token "s + token + " in parameter list");
 
@@ -210,8 +212,8 @@ void compiler_impl::handle_func_lit(mut<std::size_t> index) {
             //builders.front().append(",", op_code::none);
             token = tokens[++i];
             //builders.front().append(token, op_code::none); // TODO: valid?
-            if(tokenizer::is_identifier(token))
-                params.push(token);
+            if(tokenizer::is_identifier(token[0]))
+                params.push_back(token);
             else
                 throw std::runtime_error("Invalid parameter name: "s + token); 
         }
@@ -227,7 +229,7 @@ void compiler_impl::handle_func_lit(mut<std::size_t> index) {
     builders.front().append("{", op_code::func_start);
     op_codes.push(op_code::func_start); // TODO: operand_count == 0?
 
-    builders.emplace_front(mem, &builders, &op_codes, gen_tokenized, params);  // TODO: add params ctor
+    builders.emplace_front(mem, &builders, &op_codes, gen_tokenized, params);
 }
 
 
@@ -236,8 +238,9 @@ void compiler_impl::handle_func_end(mut<operation_type> op_type_ref) {
     op_type.code = op_code::func_lit;
 
     std::vector<char> bytecode = builders.front().finalize_bytecode();
+    std::string tokenized = builders.front().tokenized();
     builders.pop_front();
-    builders.front().append_operand(bytecode);  // TODO: create function
+    builders.front().append_operand(bytecode, tokenized);
 }
 
 
@@ -276,7 +279,7 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
 
 std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_list) {
     reset();
-    builders.emplace_front(mem, &builders, &op_codes, gen_tokenized);
+    builders.emplace_front(mem, &builders, &op_codes, gen_tokenized, std::vector<std::string_view>());
 
     tokens = std::move(token_list);
     tokens.push_back(";");
@@ -333,6 +336,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
 
         if(op_type.code == op_code::func_lit) {
             handle_func_lit(mut(i));
+            op_type.code = op_code::func_start;
             continue;
         }
 
@@ -368,6 +372,7 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
                 handle_ctrl_end(mut(op_type), mut(i));
 
                 if(!op_codes.empty() && op_codes.top() != op_code::block_start 
+                        && op_codes.top() != op_code::func_start
                         && lookup_operation(op_codes.top()).category != op_category::ctrl_end)
                     throw std::runtime_error(token + " should be at the statement level"s);
                 //if(last_code == op_code::semicolon)
