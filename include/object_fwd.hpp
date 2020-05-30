@@ -40,6 +40,12 @@ using lvalue_ref = object*;    // a pointer to an assignable object (e.g., the r
 
 
 struct func_type {
+    template<typename It>
+    func_type(It code_first, It code_last, gcvector<var_ref> caps) :
+        code(code_first, code_last), captures(std::move(caps)) {}
+   
+    void transverse(gc::action &act) { act(captures); }
+
     gcvector<char> code;     // TODO: share the code among func_types?
     gcvector<var_ref> captures;
 };

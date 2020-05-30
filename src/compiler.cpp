@@ -226,7 +226,7 @@ void compiler_impl::handle_func_lit(mut<std::size_t> index) {
         throw std::runtime_error("Expected { after fn parameter list. Got: "s + token);
 
     // TODO: is_nop?
-    builders.front().append("{", op_code::func_start);
+    builders.front().append("{", lookup_operation(op_code::func_start), op_code::func_start);
     op_codes.push(op_code::func_start); // TODO: operand_count == 0?
 
     builders.emplace_front(mem, &builders, &op_codes, gen_tokenized, params);
@@ -298,12 +298,12 @@ std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_lis
             op_type = lookup_operation(op_code::semicolon);
         } else {
             op_type = lookup_operation(token, in_binary_context, last_type);
-            if(is_empty_pair(last_type, op_type)) {
+            if(last_type.code == op_code::array_start && is_empty_pair(last_type, op_type)) {
                 pop_op_code(last_type);
                 op_type.code = last_type.primary_right_pair;
                 continue;
             }
-           //std::cout << "here " << op_type.symbol << ' ' << op_type.precedence << ' ' << last_type.symbol << ' ' << last_type.operand_count << std::endl;
+            //std::cout << "here " << op_type.symbol << ' ' << op_type.precedence << ' ' << last_type.symbol << ' ' << last_type.operand_count << std::endl;
         }
 
         if(op_type.code == op_code::colon || op_type.code == op_code::else_start) {

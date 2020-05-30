@@ -24,9 +24,6 @@ operation_type operation_types[] = {
     {".",     true,  false, 2, assoc::left,  900, false, false, cat::other,      code::dot,          code::none,         false, false, code::none,         code::none},
     {"?.",    true,  false, 2, assoc::left,  900, false, false, cat::other,      code::null_dot,     code::null_dot_end, false, false, code::none,         code::none},
     {"/?.",   true,  false, 2, assoc::left,  850, true,  false, cat::other,      code::null_dot_end, code::none,         false, false, code::none,         code::none},
-    {"(",     true,  false, 2, assoc::left,  900, false, false, cat::other,      code::func_call,    code::none,         false, true,  code::func_call_end,code::right_paren},
-  //{"?(",    true,  false, 2, assoc::left,  900, false, false, cat::other,      code::null_call,    code::none,         false, true,  code::null_call_end,code::right_paren},
-  //{"/?(",   true,  false, 2, assoc::left,  850, true,  false, cat::other,      code::null_call_end,code::none,         true,  false, code::none,         code::none},
     {"[",     true,  false, 2, assoc::left,  900, false, false, cat::other,      code::index,        code::none,         false, false, code::index_end,    code::array_end},
     {"?[",    true,  false, 2, assoc::left,  900, false, false, cat::other,      code::null_index,   code::null_index_end,false,false, code::index_end,    code::array_end},
     {"/?[",   true,  false, 2, assoc::left,  850, true,  false, cat::other,      code::null_index_end,code::none,        false, false, code::none,         code::none},
@@ -83,6 +80,9 @@ operation_type operation_types[] = {
     {":",     true,  false, 1, assoc::left,  170, false, false, cat::other,      code::colon,        code::none,         false, false, code::none,         code::none},    // TODO: next: ternary_end?
     {"/?:",   true,  false, 1, assoc::left,  170, true,  false, cat::other,      code::ternary_end,  code::none,         false, false, code::none,         code::none},
     {";",     true,  false, 1, assoc::left,   50, false, false, cat::other,      code::semicolon,    code::none,         false, false, code::none,         code::none},  // TODO: this precedence should be different?
+    {"(",     true,  false, 0, assoc::left,  900, false, false, cat::other,      code::func_call,    code::none,         false, true,  code::func_call_end,code::right_paren},
+  //{"?(",    true,  false, 0, assoc::left,  900, false, false, cat::other,      code::null_call,    code::none,         false, true,  code::null_call_end,code::right_paren},
+  //{"/?(",   true,  false, 0, assoc::left,  850, true,  false, cat::other,      code::null_call_end,code::none,         true,  false, code::none,         code::none},
     {"(",     false, false, 0, assoc::right,   0, true,  false, cat::other,      code::left_paren,   code::none,         false, false, code::right_paren,  code::func_call_end},
     {")",     true,  true,  1, assoc::left,  900, false, false, cat::other,      code::func_call_end,code::none,         true,  false, code::none,         code::none},
     {")",     true,  true,  1, assoc::left,    0, true,  false, cat::other,      code::right_paren,  code::none,         true,  false, code::none,         code::none},

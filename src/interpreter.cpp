@@ -30,6 +30,7 @@ public:
     std::string execute(const std::vector<char> &program);
 
 private:
+    func_ref make_func(std::string_view bytecode); 
     void array_add(std::vector<object> &operands);
     void map_add(std::vector<object> &operands);
     void execute_binary_op(std::vector<object> &operands, op_code code);
@@ -112,7 +113,7 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
     // TODO: params
     std::uint8_t param_count = *buffer.read<std::uint8_t>();
     (void)param_count;
-    mem->push_frame(*buffer.read<std::uint8_t>());
+    mem->push_frame(*buffer.read<std::uint8_t>() - param_count);
     
     std::uint8_t capture_count = *buffer.read<std::uint8_t>();
     std::size_t code_size = buffer.size() - capture_count;
@@ -158,12 +159,17 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         case op_code::str_lit:
             operands->push_back(object(make_string(buffer.read_str())));
             break;
+        case op_code::func_lit:
+            operands->push_back(object(make_func(buffer.read_str())));
+            break;
+        case op_code::func_call:
         case op_code::array_start:
             operands->push_back(object(make_array()));
             break;
         case op_code::map_start:
             operands->push_back(object(make_map()));
             break;
+        case op_code::param_add:
         case op_code::array_add:
         case op_code::array_end:
             array_add(*operands);
@@ -171,6 +177,9 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
         case op_code::map_add:
         case op_code::map_end:
             map_add(*operands);
+            break;
+        case op_code::func_call_end:
+            operands->push_back(object(make_array()));
             break;
         case op_code::if_cond:
         case op_code::while_cond:
@@ -207,6 +216,28 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
     last_value = object();
     mem->pop_frame();
     return result;
+}
+
+    
+func_ref interpreter_impl::make_func(std::string_view bytecode) {
+    if constexpr(debug) {
+        if(bytecode.size() < 3)
+            throw std::logic_error("make_func with bytecode length " 
+                    + std::to_string(bytecode.size()) + " < 3");
+        std::size_t min_size = static_cast<std::uint8_t>(bytecode[2]) + 3;
+        if(bytecode.size() < min_size)
+            throw std::logic_error("make_func: no room for captures with bytecode length "
+                    + std::to_string(bytecode.size()) + " < " + std::to_string(min_size));
+    }
+
+    gcvector<var_ref> captures(bytecode[2]);
+    std::size_t capture_index = bytecode.size() - captures.size();
+
+    for(var_ref &capture : captures)
+        capture = mem->get_local_var(bytecode[capture_index++]);
+
+    // TODO: remove the captures from the bytecode
+    return gc::make_ptr<func_type>(bytecode.begin(), bytecode.end(), std::move(captures));
 }
 
 

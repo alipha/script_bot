@@ -22,61 +22,61 @@ enum class op_code : std::uint8_t {
     dot,
     null_dot,
     null_dot_end,
-    func_call, // 04
     index,
     null_index,
     null_index_end,
-    lt,        // 08
-    lte,
+    lt,
+    lte,       // 08
     gt,
     gte,
-    eq,        // 0c
-    neq,
+    eq,
+    neq,       // 0c
     mod,
     bit_and,
-    bit_xor,   // 10
-    bit_or,
+    bit_xor,
+    bit_or,    // 10
     shl,
     shr,
-    pow,       // 14
-    add,
+    pow,
+    add,       // 14
     sub,
     mul,
-    div,       // 18
-    assign,
+    div,
+    assign,     // 18
     mod_assign,
     and_assign,
-    xor_assign, // 1c
-    or_assign,  
+    xor_assign,
+    or_assign,  // 1c  
     shl_assign,
     shr_assign,
-    pow_assign, // 20
-    add_assign,
+    pow_assign,
+    add_assign, // 20
     sub_assign,
     mul_assign,
-    div_assign, // 24
-    pre_inc,
+    div_assign,
+    pre_inc,    // 24
     pre_dec,
     post_inc,
-    post_dec,   // 28
-    bit_not,
+    post_dec,
+    bit_not,    // 28
     logic_not,
     plus,
-    negate,     // 2c
-    logic_and,
+    negate,
+    logic_and,     // 2c
     logic_and_end,
     logic_or,
-    logic_or_end, // 30
-    coalesce,
+    logic_or_end,
+    coalesce,     // 30
     coalesce_end,
     array_add,
-    map_add,     // 34
-    param_add,
+    map_add,
+    param_add,   // 34
     comma,
     ternary_start,
-    colon,       // 38
-    ternary_end,
+    colon,
+    ternary_end, // 38
     semicolon,
+    func_call,
     left_paren,
     func_call_end, // 3c
     right_paren,
