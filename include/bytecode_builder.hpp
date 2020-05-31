@@ -1,8 +1,10 @@
 #ifndef LIPH_BYTECODE_BUILDER_HPP
 #define LIPH_BYTECODE_BUILDER_HPP
 
+#include "object_fwd.hpp"
 #include "operation_type.hpp"
 
+#include <cstddef>
 #include <deque>
 #include <memory>
 #include <stack>
@@ -17,7 +19,7 @@ class memory;
 
 class bytecode_builder {
 public:
-    bytecode_builder(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes, bool generate_tokenized, const std::vector<std::string_view> &params);
+    bytecode_builder(memory *m, std::size_t src_start_index, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes, bool generate_tokenized, const std::vector<std::string_view> &params);
     ~bytecode_builder();
    
     bytecode_builder(const bytecode_builder &) = delete;
@@ -36,7 +38,9 @@ public:
     
     const std::string &tokenized() const;
 
-    std::vector<char> finalize_bytecode();
+    std::size_t source_start_pos() const;
+    
+    std::shared_ptr<func_def> finalize_bytecode(std::string_view source_text);
     
 private:
     friend class builder_impl;

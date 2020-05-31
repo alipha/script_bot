@@ -84,3 +84,29 @@ std::optional<gcstring> to_optional_string(const map_ref &ref, std::size_t depth
     return {std::move(out)};
 }
 
+
+std::optional<gcstring> to_optional_string(const func_ref &ref, std::size_t depth, std::size_t *count, bool) {
+    if(depth >= 20)
+        return "...";
+
+    std::size_t count_value = 0;
+    if(!count)
+        count = &count_value;
+
+    if(*count > 1000)
+        return "...";
+
+    gcstring out = ref->definition->source_text;
+
+    if(!ref->captures.empty())
+        out += " with [";
+
+    for(const auto &capture : ref->captures) {
+        out += capture->to_string(depth+1, &++*count, true) + ", ";
+    }
+
+    out.pop_back();
+    out.back() = ']';
+    return {std::move(out)};
+}
+

@@ -82,8 +82,10 @@ void tokenizer::tokenize() {
         }
 
         if(finish_token) {
-            if(token_end != token_begin)
-                toks.emplace_back(token_begin, token_end - token_begin);
+            if(token_end != token_begin) {
+                std::string_view token(token_begin, token_end - token_begin);
+                toks.emplace_back(token, token_begin - src.begin());
+            }
             token_begin = token_end;
             finish_token = false;
         }

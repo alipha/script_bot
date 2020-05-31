@@ -36,7 +36,7 @@ std::string to_hex(const std::vector<char> &bytes) {
 std::string run(compiler &c, interpreter &i, std::string_view code) {
     try {
         tokenizer t(std::string(code.data(), code.size()));
-        return i.execute(c.compile(t.tokens()));
+        return i.execute(c.compile(t.tokens(), t.source()));
     } catch(std::exception &e) {
         return "Error: "s + e.what();
     }
@@ -106,12 +106,12 @@ int main(int argc, char* argv[]) {
                 return 0;
 
             tokenizer t(std::move(line));
-            for(std::string_view token : t.tokens())
-                std::cout << '"' << token << '"' << std::endl;
+            for(symbol token : t.tokens())
+                std::cout << '"' << token.token << '"' << std::endl;
 
             std::cout << std::endl;
 
-            std::vector<char> code = c.compile(t.tokens());
+            std::vector<char> code = c.compile(t.tokens(), t.source());
 
             std::cout << c.tokenized() << std::endl;
             std::cout << to_hex(code) << std::endl;

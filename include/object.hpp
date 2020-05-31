@@ -2,15 +2,25 @@
 #define LIPH_OBJECT_HPP
 
 #include "gc.hpp"
+#include "memory_buffer.hpp"
 #include "object_fwd.hpp"
 #include "variant_util.hpp"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
+
+
+struct func_def {
+    memory_buffer<debug> code;
+    gcvector<std::shared_ptr<func_def>> func_lits;
+    gcstring source_text;
+};
 
 
 class object {

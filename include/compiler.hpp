@@ -7,6 +7,7 @@
 
 
 class memory;
+class symbol;
 class compiler_impl;
 
 
@@ -20,7 +21,7 @@ public:
     compiler &operator=(const compiler &) = delete;
     compiler &operator=(compiler &&) = delete;
 
-    std::vector<char> compile(std::vector<std::string_view> token_list);
+    std::vector<char> compile(std::vector<symbol> token_list, const std::string &source);
 
     const std::string &tokenized() const;
 

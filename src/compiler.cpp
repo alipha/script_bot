@@ -33,7 +33,7 @@ public:
     compiler_impl &operator=(const compiler_impl &) = delete;
     compiler_impl &operator=(compiler_impl &&) = delete;
 
-    std::vector<char> compile(std::vector<std::string_view> token_list);
+    std::vector<char> compile(std::vector<symbol> token_list, const std::string &source);
     
     const std::string &tokenized() const { return builders.front().tokenized(); }
 
@@ -47,7 +47,7 @@ private:
     void handle_ctrl_cond(mut<operation_type> op_type_ref);
     void handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::size_t> index);
     void handle_func_lit(mut<std::size_t> index);
-    void handle_func_end(mut<operation_type> op_type_ref);
+    void handle_func_end(mut<operation_type> op_type_ref, std::size_t index);
     
     bool pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<std::size_t> index);
 
@@ -56,7 +56,8 @@ private:
         op_codes = {};
         last_code = op_code::none;
         last_type = {};
-        tokens = {};
+        tokens.clear();
+        source_text.clear();
         builders.clear();
     }
 
@@ -65,9 +66,9 @@ private:
     std::stack<op_code> op_codes;
     op_code last_code;
     operation_type last_type;
-    std::vector<std::string_view> tokens;
+    std::vector<symbol> tokens;
+    std::string source_text;
     std::deque<bytecode_builder> builders;
-    //std::vector<std::string_view>::iterator token_it;
 };
 
 
@@ -77,8 +78,8 @@ compiler::compiler(memory *m, bool generate_tokenized)
 
 compiler::~compiler() {}
 
-std::vector<char> compiler::compile(std::vector<std::string_view> token_list) {
-    return impl->compile(std::move(token_list));
+std::vector<char> compiler::compile(std::vector<symbol> token_list, const std::string &source) {
+    return impl->compile(std::move(token_list), source);
 }
 
 const std::string &compiler::tokenized() const { return impl->tokenized(); }
@@ -194,12 +195,13 @@ void compiler_impl::handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::si
 void compiler_impl::handle_func_lit(mut<std::size_t> index) {
     auto &i = index.get();
     std::vector<std::string_view> params;
-    
-    std::string_view token = tokens[++i];
+    std::size_t start_pos = tokens[i].pos;
+
+    std::string_view token = tokens[++i].token;
     if(token != "(")
         throw std::runtime_error("Expected ( after fn. Got: "s + token);
 
-    token = tokens[++i];
+    token = tokens[++i].token;
     //builders.front().append(token, op_code::none); // TODO: valid?
     if(tokenizer::is_identifier(token[0]))
         params.push_back(token);
@@ -207,10 +209,10 @@ void compiler_impl::handle_func_lit(mut<std::size_t> index) {
         throw std::runtime_error("Unexpected token "s + token + " in parameter list");
 
     if(token != ")") {
-        while((token = tokens[++i]) == ",") {
+        while((token = tokens[++i].token) == ",") {
             // TODO: valid? for tokenized_result
             //builders.front().append(",", op_code::none);
-            token = tokens[++i];
+            token = tokens[++i].token;
             //builders.front().append(token, op_code::none); // TODO: valid?
             if(tokenizer::is_identifier(token[0]))
                 params.push_back(token);
@@ -222,25 +224,27 @@ void compiler_impl::handle_func_lit(mut<std::size_t> index) {
     if(token != ")")
         throw std::runtime_error("Unexpected token "s + token + " in parameter list. Expected , or )");
 
-    if(tokens[++i] != "{")
+    if(tokens[++i].token != "{")
         throw std::runtime_error("Expected { after fn parameter list. Got: "s + token);
 
-    // TODO: is_nop?
     builders.front().append("{", lookup_operation(op_code::func_start), op_code::func_start);
-    op_codes.push(op_code::func_start); // TODO: operand_count == 0?
+    op_codes.push(op_code::func_start);
 
-    builders.emplace_front(mem, &builders, &op_codes, gen_tokenized, params);
+    builders.emplace_front(mem, start_pos, &builders, &op_codes, gen_tokenized, params);
 }
 
 
-void compiler_impl::handle_func_end(mut<operation_type> op_type_ref) {
+void compiler_impl::handle_func_end(mut<operation_type> op_type_ref, std::size_t index) {
     auto &op_type = op_type_ref.get();
     op_type.code = op_code::func_lit;
 
-    std::vector<char> bytecode = builders.front().finalize_bytecode();
+    gcstring src_text(source_text.begin() + builders.front().source_start_pos(),
+            source_text.begin() + tokens[index + 1].pos);
+
+    std::shared_ptr<func_def> func = builders.front().finalize_bytecode(src_text);
     std::string tokenized = builders.front().tokenized();
     builders.pop_front();
-    builders.front().append_operand(bytecode, tokenized);
+    builders.front().append_operand(func, tokenized);
 }
 
 
@@ -261,7 +265,7 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
                 handle_ctrl_end(op_type_ref, index);
                 //debug_out("block start " + std::to_string(in_binary_context.get()));
             } else if(top_op_type.code == op_code::func_start) {
-                handle_func_end(op_type_ref);
+                handle_func_end(op_type_ref, index.get());
             }
 
             return true;
@@ -277,18 +281,19 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
 }
 
 
-std::vector<char> compiler_impl::compile(std::vector<std::string_view> token_list) {
+std::vector<char> compiler_impl::compile(std::vector<symbol> token_list, const std::string &source) {
     reset();
-    builders.emplace_front(mem, &builders, &op_codes, gen_tokenized, std::vector<std::string_view>());
+    builders.emplace_front(mem, 0, &builders, &op_codes, gen_tokenized, std::vector<std::string_view>());
 
+    source_text = source + ';';
     tokens = std::move(token_list);
-    tokens.push_back(";");
+    tokens.push_back({";", source_text.size() - 1});
 
     bool in_binary_context = false;
     operation_type op_type = lookup_operation(op_code::semicolon);
 
     for(std::size_t i = 0; i < tokens.size(); ++i) {
-        std::string_view token = tokens[i];
+        std::string_view token = tokens[i].token;
         
         last_code = op_type.code; 
         last_type = lookup_operation(last_code);

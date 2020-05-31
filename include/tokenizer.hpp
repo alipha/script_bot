@@ -1,11 +1,20 @@
 #ifndef LIPH_TOKENIZER_HPP
 #define LIPH_TOKENIZER_HPP
 
+#include <cstddef>
 #include <cctype>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+
+struct symbol {
+    symbol(std::string_view t, std::size_t p) : token(t), pos(p) {}
+
+    std::string_view token;
+    std::size_t pos;
+};
 
 
 class tokenizer {
@@ -18,7 +27,7 @@ public:
     tokenizer &operator=(tokenizer &&) = delete;
 
     const std::string &source() const { return src; }
-    const std::vector<std::string_view> &tokens() const { return toks; }
+    const std::vector<token> &tokens() const { return toks; }
 
     static bool is_identifier(char ch) { return std::isalpha(ch) || ch == '_' || ch == '$'; }
 
@@ -36,7 +45,7 @@ private:
     void tokenize();
 
     std::string src;
-    std::vector<std::string_view> toks;
+    std::vector<token> toks;
 };
 
 #endif

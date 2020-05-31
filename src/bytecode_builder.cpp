@@ -2,6 +2,7 @@
 #include "debug.hpp"
 #include "memory.hpp"
 #include "memory_buffer.hpp"
+#include "object_fwd.hpp"
 #include "operation_type.hpp"
 #include "stack_util.hpp"
 #include "string_util.hpp"
@@ -37,8 +38,9 @@ struct capture_mapping {
 
 class builder_impl {
 public:
-    builder_impl(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes_ptr, bool generate_tokenized, const std::vector<std::string_view> &params) 
-        : mem(m), 
+    builder_impl(memory *m, std::size_t src_start_index, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes_ptr, bool generate_tokenized, const std::vector<std::string_view> &params) 
+        : mem(m),
+          src_start_pos(src_start_index),
           parents(builders), 
           op_codes(op_codes_ptr), 
           gen_tokenized(generate_tokenized)
@@ -63,13 +65,15 @@ public:
 
 
     void append_operand(std::string_view token);
-    void append_operand(const std::vector<char> &bytecode, const std::string &func_tokens);
-
-    const std::string &tokenized() const { return tokenized_result; }
+    void append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens);
 
     void reset(const std::vector<std::string_view> &params);
     
-    std::vector<char> finalize_bytecode();
+    const std::string &tokenized() const { return tokenized_result; }
+
+    std::size_t source_start_pos() const { return src_start_pos; }
+
+    std::shared_ptr<func_def> finalize_bytecode(std::string_view source_text);
 
 private:
     static std::string parse_str_literal(std::string_view str);
@@ -79,12 +83,13 @@ private:
     std::optional<std::uint8_t> get_my_index(std::string_view name) const;
 
 
-
     memory *mem;
+    std::size_t src_start_pos;
     std::deque<bytecode_builder> *parents;
     std::stack<op_code> *op_codes;
     bool gen_tokenized;
 
+    gcvector<std::shared_ptr<func_def>> func_lits;
     std::unordered_map<std::string_view, std::uint8_t> local_var_indexes;
     std::unordered_map<std::string_view, capture_mapping> capture_indexes;
 
@@ -97,8 +102,8 @@ private:
 
 
 
-bytecode_builder::bytecode_builder(memory *m, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes, bool generate_tokenized, const std::vector<std::string_view> &params)
-    : impl(std::make_unique<builder_impl>(m, builders, op_codes, generate_tokenized, params)) {}
+bytecode_builder::bytecode_builder(memory *m, std::size_t src_start_index, std::deque<bytecode_builder> *builders, std::stack<op_code> *op_codes, bool generate_tokenized, const std::vector<std::string_view> &params)
+    : impl(std::make_unique<builder_impl>(m, src_start_index, builders, op_codes, generate_tokenized, params)) {}
 
 bytecode_builder::~bytecode_builder() {}
 
@@ -125,8 +130,12 @@ void bytecode_builder::append_operand(const std::vector<char> &bytecode, const s
 void bytecode_builder::reset(const std::vector<std::string_view> &params) { impl->reset(params); }
 
 const std::string &bytecode_builder::tokenized() const { return impl->tokenized(); }
+    
+std::size_t bytecode_builder::source_start_pos() const { return impl->source_start_pos(); }
 
-std::vector<char> bytecode_builder::finalize_bytecode() { return impl->finalize_bytecode(); }
+std::shared_ptr<func_def> bytecode_builder::finalize_bytecode(std::string_view source_text) { 
+    return impl->finalize_bytecode(source_text); 
+}
 
 
 
@@ -230,7 +239,7 @@ void builder_impl::append_operand(std::string_view token) {
 }
 
 
-void builder_impl::append_operand(const std::vector<char> &bytecode, const std::string &func_tokens) {
+void builder_impl::append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens) {
     append(std::string_view(bytecode.data(), bytecode.size()), lookup_operation(op_code::none), op_code::func_lit, func_tokens);
 }
 
@@ -254,7 +263,7 @@ void builder_impl::reset(const std::vector<std::string_view> &params) {
 }
 
 
-std::vector<char> builder_impl::finalize_bytecode() {
+std::shared_ptr<func_def> builder_impl::finalize_bytecode() {
     std::size_t local_var_count = local_var_indexes.size();
     std::size_t capture_count = capture_indexes.size();
 

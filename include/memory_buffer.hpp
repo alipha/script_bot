@@ -1,6 +1,7 @@
 #ifndef LIPH_MEMORY_BUFFER_HPP
 #define LIPH_MEMORY_BUFFER_HPP
 
+#include "object_fwd.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -19,7 +20,7 @@ template<bool BoundsCheck>
 class memory_buffer {
 public:
     memory_buffer() : pos(0) {}
-    memory_buffer(std::vector<char> buf) : buf(std::move(buf)), pos(0) {}
+    memory_buffer(gcvector<char> buf) : buf(std::move(buf)), pos(0) {}
 
     void bounds_check(std::size_t len) {
         if (BoundsCheck && (pos > buf.size() || buf.size() - pos < len)) {
@@ -104,20 +105,20 @@ public:
         pos = 0;
     }
     
-    std::vector<char> buffer() && {
-        std::vector<char> ret(std::move(buf));
+    gcvector<char> buffer() && {
+        gcvector<char> ret(std::move(buf));
         clear();
         return ret;
     }
 
-    std::vector<char> &buffer() & { return buf; }
-    const std::vector<char> &buffer() const & { return buf; }
+    gcvector<char> &buffer() & { return buf; }
+    const gcvector<char> &buffer() const & { return buf; }
 
     std::size_t position() const { return pos; }
     std::size_t size() const { return buf.size(); }
 
 private:
-    std::vector<char> buf;
+    gcvector<char> buf;
     std::size_t pos;
 };
 
