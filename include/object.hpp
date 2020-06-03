@@ -17,6 +17,9 @@
 
 
 struct func_def {
+    func_def(memory_buffer<debug> &&c, gcvector<std::shared_ptr<func_def>> &&funcs, gcstring &&text)
+        : code(std::move(c)), func_lits(std::move(funcs)), source_text(std::move(text)) {}
+
     memory_buffer<debug> code;
     gcvector<std::shared_ptr<func_def>> func_lits;
     gcstring source_text;

@@ -30,9 +30,9 @@ public:
     void append(std::string_view token, op_code code);
     void append(std::string_view token, const operation_type &op_type);
     void append(std::string_view token, const operation_type &op_type, op_code code);
-    void append(std::string_view token, const operation_type &op_type, op_code code, std::string_view func_tokens);
+    
     void append_operand(std::string_view token);
-    void append_operand(const std::vector<char> &bytecode, const std::string &func_tokens);
+    void append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens);
 
     void reset(const std::vector<std::string_view> &params);
     

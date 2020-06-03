@@ -27,7 +27,7 @@ public:
     tokenizer &operator=(tokenizer &&) = delete;
 
     const std::string &source() const { return src; }
-    const std::vector<token> &tokens() const { return toks; }
+    const std::vector<symbol> &tokens() const { return toks; }
 
     static bool is_identifier(char ch) { return std::isalpha(ch) || ch == '_' || ch == '$'; }
 
@@ -45,7 +45,7 @@ private:
     void tokenize();
 
     std::string src;
-    std::vector<token> toks;
+    std::vector<symbol> toks;
 };
 
 #endif

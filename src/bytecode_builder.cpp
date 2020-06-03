@@ -58,11 +58,7 @@ public:
     void append(std::string_view token, const operation_type &op_type) { 
         append(token, op_type, op_type.code);
     }
-    void append(std::string_view token, const operation_type &op_type, op_code code) {
-        append(token, op_type, code, std::string_view());
-    }
-    void append(std::string_view token, const operation_type &op_type, op_code code, std::string_view func_tokens);
-
+    void append(std::string_view token, const operation_type &op_type, op_code code);
 
     void append_operand(std::string_view token);
     void append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens);
@@ -123,8 +119,8 @@ void bytecode_builder::append_operand(std::string_view token) {
     impl->append_operand(token);
 }
     
-void bytecode_builder::append_operand(const std::vector<char> &bytecode, const std::string &func_tokens) {
-    impl->append_operand(bytecode, func_tokens); 
+void bytecode_builder::append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens) {
+    impl->append_operand(std::move(func), func_tokens); 
 }
 
 void bytecode_builder::reset(const std::vector<std::string_view> &params) { impl->reset(params); }
@@ -139,13 +135,10 @@ std::shared_ptr<func_def> bytecode_builder::finalize_bytecode(std::string_view s
 
 
 
-void builder_impl::append(std::string_view token, const operation_type &op_type, op_code code, std::string_view func_tokens) {
+void builder_impl::append(std::string_view token, const operation_type &op_type, op_code code) {
     if(gen_tokenized) {
-        if(code == op_code::func_lit)
-            tokenized_result += func_tokens;
-        else
-            tokenized_result += token;
-        tokenized_result += " ";
+        tokenized_result += token;
+        tokenized_result += ' ';
     }
 
     //debug_out("append: "s + token);
@@ -210,8 +203,6 @@ void builder_impl::append(std::string_view token, const operation_type &op_type,
     case op_code::float_lit:
         result.append(std::stod(std::string(token)));
         break;
-    case op_code::func_lit:
-        result.append(token);
     default:
         ; //throw std::logic_error(token + " is currently not supported"s);
     }
@@ -240,30 +231,36 @@ void builder_impl::append_operand(std::string_view token) {
 
 
 void builder_impl::append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens) {
-    append(std::string_view(bytecode.data(), bytecode.size()), lookup_operation(op_code::none), op_code::func_lit, func_tokens);
+    if(gen_tokenized)
+        tokenized_result += func_tokens + ' ';
+   
+    result.append(op_code::func_lit);
+    result.append(static_cast<std::uint8_t>(func_lits.size()));
+    func_lits.push_back(std::move(func));
 }
 
 
 // TODO: remove and put the appends in the ctor?
 void builder_impl::reset(const std::vector<std::string_view> &params) {
-        local_var_indexes.clear();
-        capture_indexes.clear();
-        jump_indexes = {};
-        while_indexes = {};
-        result.clear();
-        tokenized_result.clear();
+    func_lits.clear();
+    local_var_indexes.clear();
+    capture_indexes.clear();
+    jump_indexes = {};
+    while_indexes = {};
+    result.clear();
+    tokenized_result.clear();
 
-        result.append(static_cast<std::uint8_t>(params.size()));
-        result.append(static_cast<std::uint8_t>(0));
-        result.append(static_cast<std::uint8_t>(0));
+    result.append(static_cast<std::uint8_t>(params.size()));
+    result.append(static_cast<std::uint8_t>(0));
+    result.append(static_cast<std::uint8_t>(0));
 
-        std::uint8_t index = 0;
-        for(std::string_view param : params)
-            local_var_indexes[param] = ++index;
+    std::uint8_t index = 0;
+    for(std::string_view param : params)
+        local_var_indexes[param] = ++index;
 }
 
 
-std::shared_ptr<func_def> builder_impl::finalize_bytecode() {
+std::shared_ptr<func_def> builder_impl::finalize_bytecode(std::string_view source_text) {
     std::size_t local_var_count = local_var_indexes.size();
     std::size_t capture_count = capture_indexes.size();
 
@@ -280,7 +277,7 @@ std::shared_ptr<func_def> builder_impl::finalize_bytecode() {
 
     result.patch(1, static_cast<std::uint8_t>(local_var_count));
     result.patch(2, static_cast<std::uint8_t>(capture_count));
-    return std::move(result).buffer();
+    return std::make_shared<func_def>(std::move(result), std::move(func_lits), gcstring(source_text.begin(), source_text.end()));
 }
 
 

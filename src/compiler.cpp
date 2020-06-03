@@ -130,7 +130,7 @@ void compiler_impl::handle_pair(const operation_type &op_type, const operation_t
 op_code compiler_impl::handle_map_label(mut<std::size_t> index, bool start_map) {
 	std::size_t &i = index.get();
 
-    std::string_view token = tokens[++i];                             
+    std::string_view token = tokens[++i].token;                             
     if(start_map && token == "}") {
         op_codes.pop();
         return op_code::map_end;
@@ -148,7 +148,7 @@ op_code compiler_impl::handle_map_label(mut<std::size_t> index, bool start_map) 
         builders.front().append({t.data(), t.size()}, op_code::str_lit);
     }
 
-    token = tokens[++i];
+    token = tokens[++i].token;
     if(token != ":")
         throw std::runtime_error("Expected colon after map label, not "s + token);
 
@@ -179,9 +179,9 @@ void compiler_impl::handle_ctrl_end(mut<operation_type> op_type_ref, mut<std::si
     
     while(!op_codes.empty() && (top_op_type = lookup_operation(op_codes.top())).category == op_category::ctrl_end) {
 
-        if(top_op_type.code == op_code::if_end && tokens[i + 1] == "else") {
+        if(top_op_type.code == op_code::if_end && tokens[i + 1].token == "else") {
             op_codes.top() = op_code::else_end;
-            op_type = lookup_operation(tokens[++i], false);
+            op_type = lookup_operation(tokens[++i].token, false);
             builders.front().append(op_type.symbol, op_type);
             return;
         }
@@ -327,7 +327,7 @@ std::vector<char> compiler_impl::compile(std::vector<symbol> token_list, const s
             throw std::runtime_error(token + " should be at the start of a statement"s);
         }
 
-        if(op_type.category == op_category::ctrl_start && tokens[i + 1] != "(") {
+        if(op_type.category == op_category::ctrl_start && tokens[i + 1].token != "(") {
             throw std::runtime_error("( should follow "s + token);
         }
       
@@ -387,7 +387,7 @@ std::vector<char> compiler_impl::compile(std::vector<symbol> token_list, const s
             op_codes.push(op_type.code);
         }
 
-        if(op_type.category == op_category::ctrl_start && tokens[i + 1] != "(")
+        if(op_type.category == op_category::ctrl_start && tokens[i + 1].token != "(")
             throw std::runtime_error("Expected ( to follow "s + token);
     }
 
@@ -401,6 +401,6 @@ std::vector<char> compiler_impl::compile(std::vector<symbol> token_list, const s
         }
         */
 
-    return builders.front().finalize_bytecode();
+    return builders.front().finalize_bytecode(source_text);
 }
 

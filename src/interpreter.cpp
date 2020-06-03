@@ -105,7 +105,7 @@ void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, std::vecto
 
 std::string interpreter_impl::execute(const std::vector<char> &program) {
     std::time_t start = std::time(nullptr);
-    memory_buffer<debug> buffer(program);
+    memory_buffer<debug> buffer(gcvector<char>(program.begin(), program.end()));
     gc::anchor<std::vector<object>> operands;
     last_value = object::type(std::monostate());
 
@@ -237,7 +237,8 @@ func_ref interpreter_impl::make_func(std::string_view bytecode) {
         capture = mem->get_local_var(bytecode[capture_index++]);
 
     // TODO: remove the captures from the bytecode
-    return gc::make_ptr<func_type>(bytecode.begin(), bytecode.end(), std::move(captures));
+    // TODO: fix
+    return nullptr; //gc::make_ptr<func_type>(bytecode.begin(), bytecode.end(), std::move(captures));
 }
 
 
