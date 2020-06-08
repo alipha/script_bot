@@ -1,6 +1,7 @@
 #ifndef LIPH_COMPILER_HPP
 #define LIPH_COMPILER_HPP
 
+#include "object_fwd.hpp"
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -21,7 +22,7 @@ public:
     compiler &operator=(const compiler &) = delete;
     compiler &operator=(compiler &&) = delete;
 
-    std::vector<char> compile(std::vector<symbol> token_list, const std::string &source);
+    std::shared_ptr<func_def> compile(std::vector<symbol> token_list, const std::string &source);
 
     const std::string &tokenized() const;
 

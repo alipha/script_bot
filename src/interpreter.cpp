@@ -27,7 +27,7 @@ class interpreter_impl {
 public:
     interpreter_impl(memory *m) : mem(m) {}
     
-    std::string execute(const std::vector<char> &program);
+    std::string execute(std::shared_ptr<func_def> program);
 
 private:
     func_ref make_func(std::string_view bytecode); 
@@ -103,20 +103,15 @@ void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, std::vecto
 }
 
 
-std::string interpreter_impl::execute(const std::vector<char> &program) {
+std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
     std::time_t start = std::time(nullptr);
-    memory_buffer<debug> buffer(gcvector<char>(program.begin(), program.end()));
+    memory_buffer<debug> &buffer = program->code;
     gc::anchor<std::vector<object>> operands;
     last_value = object::type(std::monostate());
 
     mem->clear_stack();
-    // TODO: params
-    std::uint8_t param_count = *buffer.read<std::uint8_t>();
-    (void)param_count;
-    mem->push_frame(*buffer.read<std::uint8_t>() - param_count);
-    
-    std::uint8_t capture_count = *buffer.read<std::uint8_t>();
-    std::size_t code_size = buffer.size() - capture_count;
+    mem->push_frame(std::move(program), gcvector<object>());
+    std::size_t code_size = mem->current_frame().code_size;
     int loops = 1000;
 
     while(buffer.position() < code_size) {
@@ -160,7 +155,7 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
             operands->push_back(object(make_string(buffer.read_str())));
             break;
         case op_code::func_lit:
-            operands->push_back(object(make_func(buffer.read_str())));
+            operands->push_back(object(make_func(*buffer.read<std::uint8_t>())));
             break;
         case op_code::func_call:
         case op_code::array_start:
@@ -218,17 +213,16 @@ std::string interpreter_impl::execute(const std::vector<char> &program) {
     return result;
 }
 
-    
-func_ref interpreter_impl::make_func(std::string_view bytecode) {
+
+func_ref interpreter_impl::make_func(std::uint8_t func_index) {
+    std::shared_ptr<func_def> &current_func = mem->current_frame().func;
+
     if constexpr(debug) {
-        if(bytecode.size() < 3)
-            throw std::logic_error("make_func with bytecode length " 
-                    + std::to_string(bytecode.size()) + " < 3");
-        std::size_t min_size = static_cast<std::uint8_t>(bytecode[2]) + 3;
-        if(bytecode.size() < min_size)
-            throw std::logic_error("make_func: no room for captures with bytecode length "
-                    + std::to_string(bytecode.size()) + " < " + std::to_string(min_size));
+        if(func_index >= current_func->func_lits.size())
+            throw std::logic_error("make_func with func_index " + std::to_string(func_index) 
+                    + " >= " + std::to_string(current_func->func_lits.size()));
     }
+
 
     gcvector<var_ref> captures(bytecode[2]);
     std::size_t capture_index = bytecode.size() - captures.size();
@@ -236,6 +230,7 @@ func_ref interpreter_impl::make_func(std::string_view bytecode) {
     for(var_ref &capture : captures)
         capture = mem->get_local_var(bytecode[capture_index++]);
 
+    gcvector<char>
     // TODO: remove the captures from the bytecode
     // TODO: fix
     return nullptr; //gc::make_ptr<func_type>(bytecode.begin(), bytecode.end(), std::move(captures));

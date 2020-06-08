@@ -33,7 +33,7 @@ public:
     compiler_impl &operator=(const compiler_impl &) = delete;
     compiler_impl &operator=(compiler_impl &&) = delete;
 
-    std::vector<char> compile(std::vector<symbol> token_list, const std::string &source);
+    std::shared_ptr<func_def> compile(std::vector<symbol> token_list, const std::string &source);
     
     const std::string &tokenized() const { return builders.front().tokenized(); }
 
@@ -281,7 +281,7 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
 }
 
 
-std::vector<char> compiler_impl::compile(std::vector<symbol> token_list, const std::string &source) {
+std::shared_ptr<func_def> compiler_impl::compile(std::vector<symbol> token_list, const std::string &source) {
     reset();
     builders.emplace_front(mem, 0, &builders, &op_codes, gen_tokenized, std::vector<std::string_view>());
 

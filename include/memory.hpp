@@ -13,18 +13,23 @@
 
 
 struct frame {
-    frame(std::size_t s, std::size_t t) : size(s), temps_start(t) {}
-    std::size_t size;
+    std::size_t local_var_count;
     std::size_t temps_start;
+    std::shared_ptr<func_def> func;
+    std::size_t code_size;
+    gcvector<object> params;
+    std::size_t param_count;
 };
 
 
 class memory {
 public:
-    void push_frame(std::size_t size);
+    void push_frame(std::shared_ptr<func_def> func, gcvector<object> params);
     void pop_frame();
     void clear_stack();
-    
+   
+    frame &current_frame() { return frame_stack.back(); }
+
     var_ref get_local_var(std::size_t index);
 
     void push_temp(object temp) { temps_stack->push_back(std::move(temp)); }

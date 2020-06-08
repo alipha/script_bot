@@ -3,12 +3,14 @@
 #include "interpreter.hpp"
 #include "irc.hpp"
 #include "memory.hpp"
+#include "object.hpp"
 #include "settings.hpp"
 #include "string_util.hpp"
 
 #include <chrono>
 #include <ctime>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <thread>
 #include <utility>
@@ -111,11 +113,11 @@ int main(int argc, char* argv[]) {
 
             std::cout << std::endl;
 
-            std::vector<char> code = c.compile(t.tokens(), t.source());
+            std::shared_ptr<func_def> code = c.compile(t.tokens(), t.source());
 
             std::cout << c.tokenized() << std::endl;
-            std::cout << to_hex(code) << std::endl;
-            std::cout << "Result: " << i.execute(code) << std::endl;
+            std::cout << to_hex(code->code) << std::endl;
+            std::cout << "Result: " << i.execute(std::move(code)) << std::endl;
         } catch(std::exception &e) {
             std::cerr << e.what() << std::endl;
         }
