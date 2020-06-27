@@ -4,6 +4,7 @@
 #include "gc.hpp"
 #include "object.hpp"
 
+#include <cstddef>
 #include <memory>
 #include <stack>
 #include <string>
@@ -13,6 +14,7 @@
 
 
 struct frame {
+    std::size_t parent_pos;
     std::size_t local_var_count;
     std::size_t temps_start;
     std::shared_ptr<func_def> func;
@@ -24,8 +26,8 @@ struct frame {
 
 class memory {
 public:
-    void push_frame(std::shared_ptr<func_def> func, gcvector<object> params);
-    void pop_frame();
+    void push_frame(std::size_t current_pos, std::shared_ptr<func_def> func, gcvector<object> params);
+    std::size_t pop_frame();
     void clear_stack();
    
     frame &current_frame() { return frame_stack.back(); }

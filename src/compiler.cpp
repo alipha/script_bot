@@ -78,7 +78,7 @@ compiler::compiler(memory *m, bool generate_tokenized)
 
 compiler::~compiler() {}
 
-std::vector<char> compiler::compile(std::vector<symbol> token_list, const std::string &source) {
+std::shared_ptr<func_def> compiler::compile(std::vector<symbol> token_list, const std::string &source) {
     return impl->compile(std::move(token_list), source);
 }
 

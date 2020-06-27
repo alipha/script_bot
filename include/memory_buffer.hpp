@@ -20,7 +20,7 @@ template<bool BoundsCheck>
 class memory_buffer {
 public:
     memory_buffer() : pos(0) {}
-    memory_buffer(gcvector<char> buf) : buf(std::move(buf)), pos(0) {}
+    memory_buffer(gcvector<std::uint8_t> buf) : buf(std::move(buf)), pos(0) {}
 
     void bounds_check(std::size_t len) {
         if (BoundsCheck && (pos > buf.size() || buf.size() - pos < len)) {
@@ -45,7 +45,7 @@ public:
         auto len = *read<std::uint16_t>();
         bounds_check(len);
 
-        std::string_view result(&buf[pos], len);
+        std::string_view result(reinterpret_cast<char*>(&buf[pos]), len);
         pos += len;
         return result;
     }
@@ -105,20 +105,20 @@ public:
         pos = 0;
     }
     
-    gcvector<char> buffer() && {
-        gcvector<char> ret(std::move(buf));
+    gcvector<std::uint8_t> buffer() && {
+        gcvector<std::uint8_t> ret(std::move(buf));
         clear();
         return ret;
     }
 
-    gcvector<char> &buffer() & { return buf; }
-    const gcvector<char> &buffer() const & { return buf; }
+    gcvector<std::uint8_t> &buffer() & { return buf; }
+    const gcvector<std::uint8_t> &buffer() const & { return buf; }
 
     std::size_t position() const { return pos; }
     std::size_t size() const { return buf.size(); }
 
 private:
-    gcvector<char> buf;
+    gcvector<std::uint8_t> buf;
     std::size_t pos;
 };
 

@@ -30,7 +30,7 @@ public:
     std::string execute(std::shared_ptr<func_def> program);
 
 private:
-    func_ref make_func(std::string_view bytecode); 
+    func_ref make_func(std::uint8_t func_index);
     void array_add(std::vector<object> &operands);
     void map_add(std::vector<object> &operands);
     void execute_binary_op(std::vector<object> &operands, op_code code);
@@ -49,8 +49,8 @@ interpreter::interpreter(memory *m) : impl(std::make_unique<interpreter_impl>(m)
 
 interpreter::~interpreter() {}
 
-std::string interpreter::execute(const std::vector<char> &program) {
-    return impl->execute(program);
+std::string interpreter::execute(std::shared_ptr<func_def> program) {
+    return impl->execute(std::move(program));
 }
 
 
@@ -110,7 +110,7 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
     last_value = object::type(std::monostate());
 
     mem->clear_stack();
-    mem->push_frame(std::move(program), gcvector<object>());
+    mem->push_frame(0, std::move(program), gcvector<object>());
     std::size_t code_size = mem->current_frame().code_size;
     int loops = 1000;
 
@@ -174,7 +174,8 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
             map_add(*operands);
             break;
         case op_code::func_call_end:
-            operands->push_back(object(make_array()));
+            array_add(*operands);
+            //call_func(
             break;
         case op_code::if_cond:
         case op_code::while_cond:
@@ -223,6 +224,8 @@ func_ref interpreter_impl::make_func(std::uint8_t func_index) {
                     + " >= " + std::to_string(current_func->func_lits.size()));
     }
 
+    std::shared_ptr<func_def> &new_func = current_func->func_lits[func_index];
+    gcvector<std::uint8_t> &bytecode = new_func->code.buffer();
 
     gcvector<var_ref> captures(bytecode[2]);
     std::size_t capture_index = bytecode.size() - captures.size();
@@ -230,10 +233,7 @@ func_ref interpreter_impl::make_func(std::uint8_t func_index) {
     for(var_ref &capture : captures)
         capture = mem->get_local_var(bytecode[capture_index++]);
 
-    gcvector<char>
-    // TODO: remove the captures from the bytecode
-    // TODO: fix
-    return nullptr; //gc::make_ptr<func_type>(bytecode.begin(), bytecode.end(), std::move(captures));
+    return gc::make_ptr<func_type>(new_func, std::move(captures));
 }
 
 

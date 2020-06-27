@@ -41,7 +41,7 @@ using lvalue_ref = object*;    // a pointer to an assignable object (e.g., the r
 
 
 struct func_type {
-    func_type(std::shared_ptr<func_def> &&def, gcvector<var_ref> &&caps) :
+    func_type(std::shared_ptr<func_def> def, gcvector<var_ref> &&caps) :
         definition(std::move(def)), captures(std::move(caps)) {}
    
     void transverse(gc::action &act) { act(captures); }
