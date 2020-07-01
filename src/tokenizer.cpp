@@ -84,7 +84,7 @@ void tokenizer::tokenize() {
         if(finish_token) {
             if(token_end != token_begin) {
                 std::string_view token(token_begin, token_end - token_begin);
-                toks.emplace_back(token, token_begin - src.begin());
+                toks.emplace_back(token, token_begin - &src[0]);
             }
             token_begin = token_end;
             finish_token = false;

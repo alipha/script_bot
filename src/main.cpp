@@ -1,13 +1,15 @@
-#include "tokenizer.hpp"
 #include "compiler.hpp"
+#include "gc.hpp"
 #include "interpreter.hpp"
 #include "irc.hpp"
 #include "memory.hpp"
 #include "object.hpp"
 #include "settings.hpp"
 #include "string_util.hpp"
+#include "tokenizer.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <iostream>
 #include <memory>
@@ -21,7 +23,7 @@
 using namespace std::string_literals;
 
 
-std::string to_hex(const std::vector<char> &bytes) {
+std::string to_hex(const gcvector<std::uint8_t> &bytes) {
     const char *hex_chars = "0123456789abcdef";
     std::string result; //(bytes.size() * 2, '\0');
 
@@ -116,7 +118,7 @@ int main(int argc, char* argv[]) {
             std::shared_ptr<func_def> code = c.compile(t.tokens(), t.source());
 
             std::cout << c.tokenized() << std::endl;
-            std::cout << to_hex(code->code) << std::endl;
+            std::cout << to_hex(code->code.buffer()) << std::endl;
             std::cout << "Result: " << i.execute(std::move(code)) << std::endl;
         } catch(std::exception &e) {
             std::cerr << e.what() << std::endl;

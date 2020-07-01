@@ -19,14 +19,14 @@ struct frame {
     std::size_t temps_start;
     std::shared_ptr<func_def> func;
     std::size_t code_size;
-    gcvector<object> params;
+    gcvector<var_ref> params;
     std::size_t param_count;
 };
 
 
 class memory {
 public:
-    void push_frame(std::size_t current_pos, std::shared_ptr<func_def> func, gcvector<object> params);
+    void push_frame(std::size_t current_pos, std::shared_ptr<func_def> func, gcvector<var_ref> params);
     std::size_t pop_frame();
     void clear_stack();
    

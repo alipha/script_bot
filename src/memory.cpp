@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-void memory::push_frame(std::size_t current_pos, std::shared_ptr<func_def> func, gcvector<object> params) {
+void memory::push_frame(std::size_t current_pos, std::shared_ptr<func_def> func, gcvector<var_ref> params) {
     memory_buffer<debug> &buffer = func->code;
     std::uint8_t param_count = *buffer.read<std::uint8_t>();
     std::size_t local_var_count = *buffer.read<std::uint8_t>() - param_count;

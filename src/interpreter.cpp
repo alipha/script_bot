@@ -110,7 +110,7 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
     last_value = object::type(std::monostate());
 
     mem->clear_stack();
-    mem->push_frame(0, std::move(program), gcvector<object>());
+    mem->push_frame(0, std::move(program), gcvector<var_ref>());
     std::size_t code_size = mem->current_frame().code_size;
     int loops = 1000;
 

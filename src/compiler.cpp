@@ -120,6 +120,9 @@ void compiler_impl::handle_pair(const operation_type &op_type, const operation_t
     if(top_op_type.primary_right_pair != code && top_op_type.other_right_pair != code)
         throw std::runtime_error("Mismatched "s + top_op_type.symbol);
 
+    if(top_op_type.code == op_code::func_call && last_code != op_code::func_call)
+        builders.front().append(",", lookup_operation(op_code::param_add));
+
     pop_op_code(top_op_type);
     code = top_op_type.primary_right_pair;
 

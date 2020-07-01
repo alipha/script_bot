@@ -52,7 +52,7 @@ std::optional<gcstring> to_optional_string(double v,                std::size_t 
 std::optional<gcstring> to_optional_string(const array_ref &ref,    std::size_t = 0, std::size_t* = nullptr, bool = false);
 std::optional<gcstring> to_optional_string(const map_ref &ref,      std::size_t = 0, std::size_t* = nullptr, bool = false);
 
-inline std::optional<gcstring> to_optional_string(const func_ref &, std::size_t = 0, std::size_t* = nullptr, bool = false);
+std::optional<gcstring> to_optional_string(const func_ref &, std::size_t = 0, std::size_t* = nullptr, bool = false);
 
 
 template<typename T>

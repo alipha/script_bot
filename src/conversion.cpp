@@ -98,15 +98,17 @@ std::optional<gcstring> to_optional_string(const func_ref &ref, std::size_t dept
 
     gcstring out = ref->definition->source_text;
 
-    if(!ref->captures.empty())
+    if(!ref->captures.empty()) {
         out += " with [";
 
-    for(const auto &capture : ref->captures) {
-        out += capture->to_string(depth+1, &++*count, true) + ", ";
+        for(const auto &capture : ref->captures) {
+            out += capture->to_string(depth+1, &++*count, true) + ", ";
+        }
+
+        out.pop_back();
+        out.back() = ']';
     }
 
-    out.pop_back();
-    out.back() = ']';
     return {std::move(out)};
 }
 
