@@ -9,6 +9,7 @@
 #include "operation_type.hpp"
 #include "stack_util.hpp"
 #include "string_util.hpp"
+#include "variant_util.hpp"
 
 #include <ctime>
 #include <memory>
@@ -24,23 +25,40 @@ using namespace std::string_literals;
 
 
 class interpreter_impl {
+private:
+    struct program_state {
+        std::time_t start_time;
+        memory_buffer<debug> *buffer;
+        std::size_t code_size;
+        std::size_t loops;
+    };
+    
+    static constexpr std::size_t no_parent = ~0;
+    static constexpr std::size_t loop_count = 1000;
+
 public:
-    interpreter_impl(memory *m) : mem(m) {}
+    interpreter_impl(memory *m) : mem(m), last_value(), operands(), parent_operand_count(0) {}
     
     std::string execute(std::shared_ptr<func_def> program);
 
 private:
+    void execute_op_code(program_state &state);
+
     func_ref make_func(std::uint8_t func_index);
-    void array_add(std::vector<object> &operands);
-    void map_add(std::vector<object> &operands);
-    void execute_binary_op(std::vector<object> &operands, op_code code);
-    void execute_unary_op(std::vector<object> &operands, op_code code);
-    void execute_control_statement(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code);
-    void execute_short_circuit(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code, bool jump_value);
-    void execute_coalesce(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code);
+    void array_add();
+    void param_add();
+    void map_add();
+    void call_func(program_state &state);
+    void execute_binary_op(op_code code);
+    void execute_unary_op(op_code code);
+    void execute_control_statement(memory_buffer<debug> &buffer, op_code code);
+    void execute_short_circuit(memory_buffer<debug> &buffer, op_code code, bool jump_value);
+    void execute_coalesce(memory_buffer<debug> &buffer, op_code code);
 
     memory *mem;
     gc::anchor<object> last_value;
+    gc::anchor<std::vector<object>> operands;
+    std::size_t parent_operand_count;
 };
 
 
@@ -54,71 +72,107 @@ std::string interpreter::execute(std::shared_ptr<func_def> program) {
 }
 
 
-void interpreter_impl::execute_control_statement(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code) {
-    if constexpr(debug) {
-        if(operands.empty()) {
-            throw std::logic_error("execute_control_statement with zero operands. op_code: "s
-                    + lookup_operation(code).symbol);
-        }
+void interpreter_impl::execute_control_statement(memory_buffer<debug> &buffer, op_code code) {
+    if(debug && operands->size() <= parent_operand_count) {
+        throw std::logic_error("execute_control_statement with zero operands-> op_code: "s
+                + lookup_operation(code).symbol);
     }
 
     std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
 
-    if(!pop(operands)->to_bool())
+    if(!pop(*operands)->to_bool())
         buffer.seek_abs(jump_pos);
 }
 
 
-void interpreter_impl::execute_short_circuit(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code, bool jump_value) {
-    if constexpr(debug) {
-        if(operands.empty()) {
-            throw std::logic_error("execute_short_circuit with zero operands. op_code: "s
-                    + lookup_operation(code).symbol);
-        }
+void interpreter_impl::execute_short_circuit(memory_buffer<debug> &buffer, op_code code, bool jump_value) {
+    if(debug && operands->size() <= parent_operand_count) {
+        throw std::logic_error("execute_short_circuit with zero operands-> op_code: "s
+                + lookup_operation(code).symbol);
     }
 
     std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
 
-    if(operands.back().to_bool() == jump_value)
+    if(operands->back().to_bool() == jump_value)
         buffer.seek_abs(jump_pos);
     else
-        operands.pop_back();
+        operands->pop_back();
 }
 
 
-void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, std::vector<object> &operands, op_code code) {
-    if constexpr(debug) {
-        if(operands.empty()) {
-            throw std::logic_error("execute_coalesce with zero operands. op_code: "s
-                    + lookup_operation(code).symbol);
-        }
+void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, op_code code) {
+    if (debug && operands->size() <= parent_operand_count) {
+        throw std::logic_error("execute_coalesce with zero operands-> op_code: "s
+                + lookup_operation(code).symbol);
     }
 
     std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
 
-    if(!std::holds_alternative<std::monostate>(operands.back().value()))
+    if(!std::holds_alternative<std::monostate>(operands->back().value()))
         buffer.seek_abs(jump_pos);
     else
-        operands.pop_back();
+        operands->pop_back();
 }
 
 
 std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
-    std::time_t start = std::time(nullptr);
-    memory_buffer<debug> &buffer = program->code;
-    gc::anchor<std::vector<object>> operands;
+    std::size_t position = 0;
+    // TODO: func gc not safe
+    func_ref func = gc::make_ptr<func_type>(std::move(program), gcvector<var_ref>());
     last_value = object::type(std::monostate());
-
+    
+    operands->clear();
     mem->clear_stack();
-    mem->push_frame(0, std::move(program), gcvector<var_ref>());
-    std::size_t code_size = mem->current_frame().code_size;
-    int loops = 1000;
+    mem->push_frame(no_parent, 0, func, make_array());  // TODO: make_array gc not safe
 
-    while(buffer.position() < code_size) {
-        if(--loops == 0) {
-            if(std::time(nullptr) - start > 30)
+    program_state state = {
+        std::time(nullptr),
+        &mem->current_frame().func->definition->code,
+        mem->current_frame().code_size,
+        loop_count
+    };
+
+    while(true) {
+        while(state.buffer->position() < state.code_size)
+            execute_op_code(state);
+
+        std::cout << "here" << std::endl;
+        parent_operand_count = mem->current_frame().parent_operand_count;
+        if(debug && parent_operand_count > operands->size())
+            throw std::logic_error("parent_operand_count " + std::to_string(parent_operand_count)
+                    + " > operands->size() " + std::to_string(operands->size()));
+
+        operands->resize(parent_operand_count);
+        position = mem->pop_frame();
+        if(position == no_parent)
+            break;
+
+        std::cout << "pushing back " << to_std_string(last_value->to_string()) << std::endl;
+        operands->push_back(*last_value);
+        state.buffer = &mem->current_frame().func->definition->code;
+        state.code_size = mem->current_frame().code_size;
+        state.buffer->seek_abs(position);
+
+    }
+
+    if(debug && !operands->empty()) {
+        throw std::logic_error("Expected no operands in stack. size: " + std::to_string(operands->size()));
+    }
+    
+    std::string result = to_std_string(last_value->to_string());
+    last_value = object();
+    //mem->pop_frame();
+    return result;
+}
+
+
+void interpreter_impl::execute_op_code(program_state &state) {
+        memory_buffer<debug> &buffer = *state.buffer;
+
+        if(--state.loops == 0) {
+            if(std::time(nullptr) - state.start_time > 30)
                 throw std::runtime_error("Execution terminated after 30 seconds");
-            loops = 1000;
+            state.loops = loop_count;
         }
 
         op_code code = *buffer.read<op_code>();
@@ -126,7 +180,7 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
         switch(code) { 
         case op_code::else_start:
         case op_code::while_end:
-            if(!operands->empty())
+            if(operands->size() > parent_operand_count)
                 operands->pop_back();
             buffer.seek_abs(*buffer.read<std::uint32_t>());
             break;
@@ -165,64 +219,49 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
             operands->push_back(object(make_map()));
             break;
         case op_code::param_add:
+            param_add();
+            break;
         case op_code::array_add:
         case op_code::array_end:
-            array_add(*operands);
+            array_add();
             break;
         case op_code::map_add:
         case op_code::map_end:
-            map_add(*operands);
+            map_add();
             break;
         case op_code::func_call_end:
-            array_add(*operands);
-            //call_func(
+            call_func(state);
             break;
         case op_code::if_cond:
         case op_code::while_cond:
-            execute_control_statement(buffer, *operands, code);
+            execute_control_statement(buffer, code);
             break;
         case op_code::logic_and:
         case op_code::logic_or:
-            execute_short_circuit(buffer, *operands, code, code == op_code::logic_or);
+            execute_short_circuit(buffer, code, code == op_code::logic_or);
             break;
         case op_code::coalesce:
-            execute_coalesce(buffer, *operands, code);
+            execute_coalesce(buffer, code);
             break;
         default:
-            if constexpr(debug) {
-                if(lookup_operation(code).is_nop)
-                    throw std::logic_error("Unexpected "s + lookup_operation(code).symbol + " in program");
-            }
+            if(debug && lookup_operation(code).is_nop)
+                throw std::logic_error("Unexpected "s + lookup_operation(code).symbol + " in program");
 
             if(is_binary_op(code)) {
-                execute_binary_op(*operands, code);
+                execute_binary_op(code);
             } else {
-                executor::unary_op(last_value, *operands, code);
+                executor::unary_op(last_value, *operands, parent_operand_count, code);
             }
         }
-    }
-
-    if constexpr(debug) {
-        if(!operands->empty()) {
-            throw std::logic_error("Expected no operands in stack. size: " + std::to_string(operands->size()));
-        }
-    }
-    
-    std::string result = to_std_string(last_value->to_string());
-    last_value = object();
-    mem->pop_frame();
-    return result;
 }
 
 
 func_ref interpreter_impl::make_func(std::uint8_t func_index) {
-    std::shared_ptr<func_def> &current_func = mem->current_frame().func;
+    std::shared_ptr<func_def> &current_func = mem->current_frame().func->definition;
 
-    if constexpr(debug) {
-        if(func_index >= current_func->func_lits.size())
-            throw std::logic_error("make_func with func_index " + std::to_string(func_index) 
-                    + " >= " + std::to_string(current_func->func_lits.size()));
-    }
+    if(debug && func_index >= current_func->func_lits.size())
+        throw std::logic_error("make_func with func_index " + std::to_string(func_index) 
+                + " >= " + std::to_string(current_func->func_lits.size()));
 
     std::shared_ptr<func_def> &new_func = current_func->func_lits[func_index];
     gcvector<std::uint8_t> &bytecode = new_func->code.buffer();
@@ -237,45 +276,68 @@ func_ref interpreter_impl::make_func(std::uint8_t func_index) {
 }
 
 
-void interpreter_impl::array_add(std::vector<object> &operands) {
-    if constexpr(debug) {
-        if(operands.size() < 2)
-            throw std::logic_error("execute array_add with " + std::to_string(operands.size()) + " operands");
-    }
+void interpreter_impl::array_add() {
+    if(debug && operands->size() < parent_operand_count + 2)
+        throw std::logic_error("execute array_add with " + std::to_string(operands->size() - parent_operand_count) + " operands");
 
-    object &array = *(operands.end() - 2);
-    std::get<array_ref>(array.value())->push_back(operands.back());
-    operands.pop_back();
+    object &array = *(operands->end() - 2);
+    std::get<array_ref>(array.value())->push_back(operands->back());
+    operands->pop_back();
 }
 
 
-void interpreter_impl::map_add(std::vector<object> &operands) {
-    if constexpr(debug) {
-        if(operands.size() < 3)
-            throw std::logic_error("execute map_add with " + std::to_string(operands.size()) + " operands");
-    }
+void interpreter_impl::param_add() {
+    if(debug && operands->size() < parent_operand_count + 2)
+        throw std::logic_error("execute param_add with " + std::to_string(operands->size() - parent_operand_count) + " operands");
 
-    object &value = operands.back();
-    object &key = *(operands.end() - 2);
-    object &map = *(operands.end() - 3);
+    object &array = *(operands->end() - 2);
+    object::type param = to_variant<object::type>(operands->back().value());
+    std::get<array_ref>(array.value())->push_back(object(make_lvalue(std::move(param))));
+    operands->pop_back();
+}
+
+
+void interpreter_impl::map_add() {
+    if(debug && operands->size() < parent_operand_count + 3)
+        throw std::logic_error("execute map_add with " + std::to_string(operands->size() - parent_operand_count) + " operands");
+
+    object &value = operands->back();
+    object &key = *(operands->end() - 2);
+    object &map = *(operands->end() - 3);
     std::get<map_ref>(map.value())->try_emplace(key.to_string(), value);
-    operands.pop_back();
-    operands.pop_back();
+    operands->pop_back();
+    operands->pop_back();
+}
+
+    
+void interpreter_impl::call_func(program_state &state) {
+    if(debug && operands->size() < parent_operand_count + 2)
+        throw std::logic_error("call_func with " + std::to_string(operands->size() - parent_operand_count) + " operands");
+
+    array_ref &params = std::get<array_ref>(operands->back().get());
+    object::value_type func_obj = (operands->end() - 2)->value();
+    func_ref *func = std::get_if<func_ref>(&func_obj);
+    if(!func)
+        throw std::runtime_error("left of () is not a function");
+
+    mem->push_frame(state.buffer->position(), operands->size() - 2, std::move(*func), std::move(params));
+    state.buffer = &mem->current_frame().func->definition->code;
+    state.code_size = mem->current_frame().code_size;
+    operands->pop_back();
+    operands->pop_back();
 }
 
 
-void interpreter_impl::execute_binary_op(std::vector<object> &operands, op_code code) {
-    if constexpr(debug) {
-        if(operands.size() < 2) {
-            throw std::logic_error("execute_binary_op with " + std::to_string(operands.size()) 
-                    + " operands. op_code: " + lookup_operation(code).symbol);
-        }
+void interpreter_impl::execute_binary_op(op_code code) {
+    if(debug && operands->size() < parent_operand_count + 2) {
+        throw std::logic_error("execute_binary_op with " + std::to_string(operands->size() - parent_operand_count) 
+                + " operands. op_code: " + lookup_operation(code).symbol);
     }
 
     bool is_assign = is_binary_assignment(code);
     // TODO: only use anchors when the op is something that allocates memory?
-    gc::anchor<object> right = pop(operands);
-    gc::anchor<object> left = is_assign ? gc::anchor<object>(operands.back()) : pop(operands);
+    gc::anchor<object> right = pop(*operands);
+    gc::anchor<object> left = is_assign ? gc::anchor<object>(operands->back()) : pop(*operands);
     object result;
 
     if(is_assign && code != op_code::assign) {
@@ -304,7 +366,7 @@ void interpreter_impl::execute_binary_op(std::vector<object> &operands, op_code 
             throw std::runtime_error("left of "s + lookup_operation(code).symbol + " is not assignable");
         }
     } else {
-        operands.push_back(std::move(result));
+        operands->push_back(std::move(result));
     }
 }
 

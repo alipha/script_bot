@@ -24,11 +24,6 @@
 
 using namespace std::string_literals;
 
-class memory;
-
-
-constexpr std::uint8_t capture_index_start = 128;
-
 
 struct capture_mapping {
     std::uint8_t parent_index;

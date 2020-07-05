@@ -21,19 +21,18 @@ using namespace std::string_literals;
 namespace executor {
 
 
-void unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, op_code code) {
+void unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std::size_t parent_operand_count, op_code code) {
     if(code == op_code::semicolon) {
-        if(!operands.empty())
+        std::cout << "semicolon: " << operands.size() << ", " << parent_operand_count << std::endl;
+        if(operands.size() > parent_operand_count)
             last_value = pop(operands);
         //operands.clear();   // TODO: should i do this?
         return;
     }
 
-    if constexpr(debug) {
-        if(operands.empty()) {
-            throw std::logic_error("execute_unary_op with zero operands. op_code: "s
-                    + lookup_operation(code).symbol);
-        }
+    if(debug && operands.size() <= parent_operand_count) {
+        throw std::logic_error("execute_unary_op with zero operands. op_code: "s
+                + lookup_operation(code).symbol);
     }
 
     bool is_pre = (code == op_code::pre_inc || code == op_code::pre_dec);

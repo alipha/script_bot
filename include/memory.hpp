@@ -13,24 +13,33 @@
 #include <vector>
 
 
+constexpr std::uint8_t capture_index_start = 128;
+
+
 struct frame {
     std::size_t parent_pos;
+    std::size_t parent_operand_count;
     std::size_t local_var_count;
     std::size_t temps_start;
-    std::shared_ptr<func_def> func;
+    func_ref func;
     std::size_t code_size;
-    gcvector<var_ref> params;
+    array_ref params;
     std::size_t param_count;
+    
+    void transverse(gc::action &act) {
+        act(func);
+        act(params);
+    }
 };
 
 
 class memory {
 public:
-    void push_frame(std::size_t current_pos, std::shared_ptr<func_def> func, gcvector<var_ref> params);
+    void push_frame(std::size_t current_pos, std::size_t current_operand_count, func_ref func, array_ref params);
     std::size_t pop_frame();
     void clear_stack();
    
-    frame &current_frame() { return frame_stack.back(); }
+    frame &current_frame() { return frame_stack->back(); }
 
     var_ref get_local_var(std::size_t index);
 
@@ -40,7 +49,7 @@ private:
     gc::anchor<std::unordered_map<std::string, var_ref>> globals;
     gc::anchor<std::vector<object>> temps_stack;
     gc::anchor<std::vector<var_ref>> local_var_stack;
-    std::vector<frame> frame_stack;
+    gc::anchor<std::vector<frame>> frame_stack;
 };
 
 #endif
