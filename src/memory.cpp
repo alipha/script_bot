@@ -9,6 +9,9 @@
 #include <vector>
 
 void memory::push_frame(std::size_t current_pos, std::size_t current_operand_count, func_ref func, array_ref params) {
+    gc::anchor_ptr<func_type> func_anchor = func;
+    gc::anchor_ptr<gcvector<object>> params_anchor = params;
+
     memory_buffer<debug> &buffer = func->definition->code;
     buffer.seek_abs(0);
     std::uint8_t param_count = *buffer.read<std::uint8_t>();
@@ -17,8 +20,10 @@ void memory::push_frame(std::size_t current_pos, std::size_t current_operand_cou
     std::uint8_t capture_count = *buffer.read<std::uint8_t>();
     std::size_t code_size = buffer.size() - capture_count;
 
-    for(std::size_t i = params->size(); i < param_count; ++i)
-        params->push_back(object(make_lvalue()));
+    for(std::size_t i = params->size(); i < param_count; ++i) {
+        gc::anchor_ptr<object> param = make_lvalue();
+        params->push_back(object(param));
+    }
 
     for(std::size_t i = 0; i < local_var_count; ++i)
         local_var_stack->push_back(make_lvalue());

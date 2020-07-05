@@ -23,7 +23,7 @@ namespace executor {
 
 void unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std::size_t parent_operand_count, op_code code) {
     if(code == op_code::semicolon) {
-        std::cout << "semicolon: " << operands.size() << ", " << parent_operand_count << std::endl;
+        //std::cout << "semicolon: " << operands.size() << ", " << parent_operand_count << std::endl;
         if(operands.size() > parent_operand_count)
             last_value = pop(operands);
         //operands.clear();   // TODO: should i do this?

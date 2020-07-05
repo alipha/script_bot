@@ -6,6 +6,8 @@ nick=LiphBot
 # approximately the max number of bytes the bot is allowed to use
 # (the below is about 100MB)
 max_memory=100000000
+# number of nested function calls allowed before a stack overflow error occurs
+max_call_depth=1000
 
 # multiple admin= lines are allowed
 admin=Alipha

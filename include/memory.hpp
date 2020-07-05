@@ -40,6 +40,8 @@ public:
     void clear_stack();
    
     frame &current_frame() { return frame_stack->back(); }
+    
+    std::size_t call_depth() const { return frame_stack->size(); }
 
     var_ref get_local_var(std::size_t index);
 

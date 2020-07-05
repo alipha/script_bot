@@ -76,7 +76,9 @@ int main(int argc, char* argv[]) {
     settings setting("settings.txt");
     memory m;
     compiler c(&m, true);
-    interpreter i(&m);
+
+    std::string_view max_depth = setting.first("max_call_depth").value_or("1000");
+    interpreter i(&m, std::stoul(std::string(max_depth)));
 
     std::string_view max_memory = setting.first("max_memory").value_or("100000000");
     gc::set_memory_limit(std::stoul(std::string(max_memory)));

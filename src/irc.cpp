@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -150,8 +151,10 @@ irc_message irc_client_impl::read() {
     std::string line;
 
     do {
-        boost::asio::read_until(sock, sock_buf, "\r\n");
-        std::getline(sock_stream, line);
+        if(!boost::asio::read_until(sock, sock_buf, "\r\n")
+                || !std::getline(sock_stream, line)) {
+            throw std::runtime_error("error reading from socket");
+        }
 
         if(line.empty() || line.front() == '\r')
             continue;

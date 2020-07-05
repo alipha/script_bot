@@ -11,6 +11,7 @@
 #include "string_util.hpp"
 #include "variant_util.hpp"
 
+#include <cstddef>
 #include <ctime>
 #include <memory>
 #include <stdexcept>
@@ -37,7 +38,8 @@ private:
     static constexpr std::size_t loop_count = 1000;
 
 public:
-    interpreter_impl(memory *m) : mem(m), last_value(), operands(), parent_operand_count(0) {}
+    interpreter_impl(memory *m, std::size_t max_call_depth) 
+        : mem(m), max_depth(max_call_depth), last_value(), operands(), parent_operand_count(0) {}
     
     std::string execute(std::shared_ptr<func_def> program);
 
@@ -56,6 +58,7 @@ private:
     void execute_coalesce(memory_buffer<debug> &buffer, op_code code);
 
     memory *mem;
+    std::size_t max_depth;
     gc::anchor<object> last_value;
     gc::anchor<std::vector<object>> operands;
     std::size_t parent_operand_count;
@@ -63,7 +66,8 @@ private:
 
 
 
-interpreter::interpreter(memory *m) : impl(std::make_unique<interpreter_impl>(m)) {}
+interpreter::interpreter(memory *m, std::size_t max_call_depth) 
+    : impl(std::make_unique<interpreter_impl>(m, max_call_depth)) {}
 
 interpreter::~interpreter() {}
 
@@ -117,13 +121,13 @@ void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, op_code co
 
 std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
     std::size_t position = 0;
-    // TODO: func gc not safe
     func_ref func = gc::make_ptr<func_type>(std::move(program), gcvector<var_ref>());
     last_value = object::type(std::monostate());
-    
+   
+    parent_operand_count = 0; 
     operands->clear();
     mem->clear_stack();
-    mem->push_frame(no_parent, 0, func, make_array());  // TODO: make_array gc not safe
+    mem->push_frame(no_parent, 0, func, make_array());
 
     program_state state = {
         std::time(nullptr),
@@ -136,7 +140,6 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
         while(state.buffer->position() < state.code_size)
             execute_op_code(state);
 
-        std::cout << "here" << std::endl;
         parent_operand_count = mem->current_frame().parent_operand_count;
         if(debug && parent_operand_count > operands->size())
             throw std::logic_error("parent_operand_count " + std::to_string(parent_operand_count)
@@ -147,12 +150,12 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
         if(position == no_parent)
             break;
 
-        std::cout << "pushing back " << to_std_string(last_value->to_string()) << std::endl;
+        //std::cout << "pushing back " << to_std_string(last_value->to_string()) << std::endl;
         operands->push_back(*last_value);
+        parent_operand_count = mem->current_frame().parent_operand_count;
         state.buffer = &mem->current_frame().func->definition->code;
         state.code_size = mem->current_frame().code_size;
         state.buffer->seek_abs(position);
-
     }
 
     if(debug && !operands->empty()) {
@@ -167,92 +170,107 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
 
 
 void interpreter_impl::execute_op_code(program_state &state) {
-        memory_buffer<debug> &buffer = *state.buffer;
+    memory_buffer<debug> &buffer = *state.buffer;
 
-        if(--state.loops == 0) {
-            if(std::time(nullptr) - state.start_time > 30)
-                throw std::runtime_error("Execution terminated after 30 seconds");
-            state.loops = loop_count;
+    if(--state.loops == 0) {
+        if(std::time(nullptr) - state.start_time > 30)
+            throw std::runtime_error("Execution terminated after 30 seconds");
+        state.loops = loop_count;
+    }
+
+    op_code code = *buffer.read<op_code>();
+  
+    switch(code) { 
+    case op_code::else_start:
+    case op_code::while_end:
+        if(operands->size() > parent_operand_count)
+            operands->pop_back();
+        buffer.seek_abs(*buffer.read<std::uint32_t>());
+        break;
+    /*case op_code::if_end:
+        if(!operands->empty())
+            operands->pop();
+        break;*/
+    case op_code::global_var:
+        throw std::logic_error("global_var is currently unsupported");
+    case op_code::local_var:
+        operands->push_back(object(mem->get_local_var(*buffer.read<std::uint8_t>())));
+        break;
+    case op_code::int_lit:
+        operands->push_back(object(*buffer.read<std::int64_t>()));
+        break;
+    case op_code::uint_lit:
+        operands->push_back(object(*buffer.read<std::uint64_t>()));
+        break;
+    case op_code::float_lit:
+        operands->push_back(object(*buffer.read<double>()));
+        break;
+    case op_code::null_lit:
+        operands->push_back(object());
+        break;
+    case op_code::str_lit:
+        operands->push_back(object(make_string(buffer.read_str())));
+        break;
+    case op_code::func_lit:
+        operands->push_back(object(make_func(*buffer.read<std::uint8_t>())));
+        break;
+    case op_code::func_call:
+    case op_code::array_start:
+        operands->push_back(object(make_array()));
+        break;
+    case op_code::map_start:
+        operands->push_back(object(make_map()));
+        break;
+    case op_code::param_add:
+        param_add();
+        break;
+    case op_code::array_add:
+    case op_code::array_end:
+        array_add();
+        break;
+    case op_code::map_add:
+    case op_code::map_end:
+        map_add();
+        break;
+    case op_code::func_call_end:
+        call_func(state);
+        break;
+    case op_code::if_cond:
+    case op_code::while_cond:
+        execute_control_statement(buffer, code);
+        break;
+    case op_code::logic_and:
+    case op_code::logic_or:
+        execute_short_circuit(buffer, code, code == op_code::logic_or);
+        break;
+    case op_code::coalesce:
+        execute_coalesce(buffer, code);
+        break;
+    default:
+        if(debug && lookup_operation(code).is_nop)
+            throw std::logic_error("Unexpected "s + lookup_operation(code).symbol + " in program");
+
+        if(is_binary_op(code)) {
+            execute_binary_op(code);
+        } else {
+            executor::unary_op(last_value, *operands, parent_operand_count, code);
         }
+    }
 
-        op_code code = *buffer.read<op_code>();
-      
-        switch(code) { 
-        case op_code::else_start:
-        case op_code::while_end:
-            if(operands->size() > parent_operand_count)
-                operands->pop_back();
-            buffer.seek_abs(*buffer.read<std::uint32_t>());
-            break;
-        /*case op_code::if_end:
-            if(!operands->empty())
-                operands->pop();
-            break;*/
-        case op_code::global_var:
-            throw std::logic_error("global_var is currently unsupported");
-        case op_code::local_var:
-            operands->push_back(object(mem->get_local_var(*buffer.read<std::uint8_t>())));
-            break;
-        case op_code::int_lit:
-            operands->push_back(object(*buffer.read<std::int64_t>()));
-            break;
-        case op_code::uint_lit:
-            operands->push_back(object(*buffer.read<std::uint64_t>()));
-            break;
-        case op_code::float_lit:
-            operands->push_back(object(*buffer.read<double>()));
-            break;
-        case op_code::null_lit:
-            operands->push_back(object());
-            break;
-        case op_code::str_lit:
-            operands->push_back(object(make_string(buffer.read_str())));
-            break;
-        case op_code::func_lit:
-            operands->push_back(object(make_func(*buffer.read<std::uint8_t>())));
-            break;
-        case op_code::func_call:
-        case op_code::array_start:
-            operands->push_back(object(make_array()));
-            break;
-        case op_code::map_start:
-            operands->push_back(object(make_map()));
-            break;
-        case op_code::param_add:
-            param_add();
-            break;
-        case op_code::array_add:
-        case op_code::array_end:
-            array_add();
-            break;
-        case op_code::map_add:
-        case op_code::map_end:
-            map_add();
-            break;
-        case op_code::func_call_end:
-            call_func(state);
-            break;
-        case op_code::if_cond:
-        case op_code::while_cond:
-            execute_control_statement(buffer, code);
-            break;
-        case op_code::logic_and:
-        case op_code::logic_or:
-            execute_short_circuit(buffer, code, code == op_code::logic_or);
-            break;
-        case op_code::coalesce:
-            execute_coalesce(buffer, code);
-            break;
-        default:
-            if(debug && lookup_operation(code).is_nop)
-                throw std::logic_error("Unexpected "s + lookup_operation(code).symbol + " in program");
-
-            if(is_binary_op(code)) {
-                execute_binary_op(code);
-            } else {
-                executor::unary_op(last_value, *operands, parent_operand_count, code);
-            }
-        }
+    /*
+    if(code < op_code::count)
+        std::cout << lookup_operation(code).symbol;
+    else
+        std::cout << std::hex << static_cast<int>(code) << std::dec;
+    std::cout << " : " << operands->size() << " " << parent_operand_count << " = ";
+    for(auto &op : *operands) {
+        if(std::holds_alternative<func_ref>(op.value()))
+            std::cout << "func ";
+        else
+            std::cout << to_std_string(op.to_string()) << " ";
+    }
+    std::cout << std::endl;
+    */
 }
 
 
@@ -292,7 +310,11 @@ void interpreter_impl::param_add() {
 
     object &array = *(operands->end() - 2);
     object::type param = to_variant<object::type>(operands->back().value());
-    std::get<array_ref>(array.value())->push_back(object(make_lvalue(std::move(param))));
+
+    gc::anchor_ptr<object> param_lvalue = make_lvalue(std::move(param));
+    //gc::anchor_ptr<object> param_anchor = param_lvalue;
+
+    std::get<array_ref>(array.value())->push_back(object(param_lvalue));
     operands->pop_back();
 }
 
@@ -314,6 +336,9 @@ void interpreter_impl::call_func(program_state &state) {
     if(debug && operands->size() < parent_operand_count + 2)
         throw std::logic_error("call_func with " + std::to_string(operands->size() - parent_operand_count) + " operands");
 
+    if(mem->call_depth() > max_depth)
+        throw std::runtime_error("stack overflow: max call depth of " + std::to_string(max_depth));
+
     array_ref &params = std::get<array_ref>(operands->back().get());
     object::value_type func_obj = (operands->end() - 2)->value();
     func_ref *func = std::get_if<func_ref>(&func_obj);
@@ -325,6 +350,7 @@ void interpreter_impl::call_func(program_state &state) {
     state.code_size = mem->current_frame().code_size;
     operands->pop_back();
     operands->pop_back();
+    parent_operand_count = operands->size();
 }
 
 
