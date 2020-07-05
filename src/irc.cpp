@@ -156,8 +156,10 @@ irc_message irc_client_impl::read() {
             throw std::runtime_error("error reading from socket");
         }
 
-        if(line.empty() || line.front() == '\r')
+        if(line.empty() || line.front() == '\r') {
+            std::cout << "Empty line" << std::endl;
             continue;
+        }
 
         if(line.back() == '\r')
             line.pop_back();

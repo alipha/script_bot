@@ -21,13 +21,13 @@ using namespace std::string_literals;
 namespace executor {
 
 
-void unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std::size_t parent_operand_count, op_code code) {
-    if(code == op_code::semicolon) {
+bool unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std::size_t parent_operand_count, op_code code) {
+    if(code == op_code::semicolon || code == op_code::ret) {
         //std::cout << "semicolon: " << operands.size() << ", " << parent_operand_count << std::endl;
         if(operands.size() > parent_operand_count)
             last_value = pop(operands);
         //operands.clear();   // TODO: should i do this?
-        return;
+        return code == op_code::ret;
     }
 
     if(debug && operands.size() <= parent_operand_count) {
@@ -44,7 +44,7 @@ void unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std
 
     if(code == op_code::logic_not) {
         operands.push_back(object(static_cast<std::int64_t>(!operand.to_bool())));
-        return;
+        return false;
     }
 
     object result = object(std::visit([code](auto &&v) -> object::type {
@@ -86,6 +86,8 @@ void unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std
     } else {
         operands.push_back(std::move(result));
     }
+
+    return false;
 }
 
 

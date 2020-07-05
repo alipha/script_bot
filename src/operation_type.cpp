@@ -104,7 +104,7 @@ operation_type operation_types[] = {
     {"while?",false, false, 1, assoc::left,   50, false, false, cat::ctrl_cond,  code::while_cond,   code::while_end,    false, false, code::none,         code::none},
     {"/while",false, false, 1, assoc::right,  50, false, false, cat::ctrl_end,   code::while_end,    code::none,         false, false, code::none,         code::none},
     {"fn",    false, true,  0, assoc::right,   0, false, false, cat::other,      code::func_lit,     code::none,         false, false, code::none,         code::none},
-    {"return",false, false, 1, assoc::right,  50, false, true,  cat::other,      code::ret,          code::none,         false, false, code::none,         code::none}
+    {"return",false, false, 1, assoc::right,  60, false, true,  cat::other,      code::ret,          code::none,         false, false, code::none,         code::none}
     //{"return",false,false,1, assoc::left,   50, true,  false, cat::ctrl_cond,  code::return_start, code::return_end,   false, false, code::none,         code::none},
     //{"/return",false,false,1,assoc::right,  50, false, false, cat::ctrl_end,   code::return_end,   code::none,         false, false, code::none,         code::none}
 };

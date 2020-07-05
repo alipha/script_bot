@@ -27,6 +27,9 @@ using namespace std::string_literals;
 
 class interpreter_impl {
 private:
+    static constexpr std::size_t no_parent = ~0;
+    static constexpr std::size_t loop_count = 1000;
+
     struct program_state {
         std::time_t start_time;
         memory_buffer<debug> *buffer;
@@ -34,9 +37,6 @@ private:
         std::size_t loops;
     };
     
-    static constexpr std::size_t no_parent = ~0;
-    static constexpr std::size_t loop_count = 1000;
-
 public:
     interpreter_impl(memory *m, std::size_t max_call_depth) 
         : mem(m), max_depth(max_call_depth), last_value(), operands(), parent_operand_count(0) {}
@@ -253,7 +253,8 @@ void interpreter_impl::execute_op_code(program_state &state) {
         if(is_binary_op(code)) {
             execute_binary_op(code);
         } else {
-            executor::unary_op(last_value, *operands, parent_operand_count, code);
+            if(executor::unary_op(last_value, *operands, parent_operand_count, code))
+                buffer.seek_abs(state.code_size);
         }
     }
 
