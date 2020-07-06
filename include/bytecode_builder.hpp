@@ -31,7 +31,7 @@ public:
     void append(std::string_view token, const operation_type &op_type);
     void append(std::string_view token, const operation_type &op_type, op_code code);
     
-    void append_operand(std::string_view token);
+    void append_operand(std::string_view token, bool is_global);
     void append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens);
 
     void reset(const std::vector<std::string_view> &params);

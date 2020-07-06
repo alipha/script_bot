@@ -1,6 +1,7 @@
 #include "compiler.hpp"
 #include "bytecode_builder.hpp"
 #include "debug.hpp"
+#include "memory.hpp"
 #include "operation_type.hpp"
 #include "stack_util.hpp"
 #include "string_util.hpp"
@@ -33,7 +34,7 @@ public:
     compiler_impl &operator=(const compiler_impl &) = delete;
     compiler_impl &operator=(compiler_impl &&) = delete;
 
-    std::shared_ptr<func_def> compile(std::vector<symbol> token_list, const std::string &source);
+    std::shared_ptr<func_def> compile(std::vector<symbol> token_list, const std::string &source, bool persist_vars);
     
     const std::string &tokenized() const { return builders.front().tokenized(); }
 
@@ -78,8 +79,8 @@ compiler::compiler(memory *m, bool generate_tokenized)
 
 compiler::~compiler() {}
 
-std::shared_ptr<func_def> compiler::compile(std::vector<symbol> token_list, const std::string &source) {
-    return impl->compile(std::move(token_list), source);
+std::shared_ptr<func_def> compiler::compile(std::vector<symbol> token_list, const std::string &source, bool persist_vars) {
+    return impl->compile(std::move(token_list), source, persist_vars);
 }
 
 const std::string &compiler::tokenized() const { return impl->tokenized(); }
@@ -284,7 +285,7 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
 }
 
 
-std::shared_ptr<func_def> compiler_impl::compile(std::vector<symbol> token_list, const std::string &source) {
+std::shared_ptr<func_def> compiler_impl::compile(std::vector<symbol> token_list, const std::string &source, bool persist_vars) {
     reset();
     builders.emplace_front(mem, 0, &builders, &op_codes, gen_tokenized, std::vector<std::string_view>());
 
@@ -339,7 +340,9 @@ std::shared_ptr<func_def> compiler_impl::compile(std::vector<symbol> token_list,
             if(in_binary_context)
                 throw std::runtime_error("`"s + token + "` was not expected at this point.");
 
-            builders.front().append_operand(token);
+            bool is_global = (persist_vars && builders.size() == 1) 
+                || mem->has_global(std::string(token));
+            builders.front().append_operand(token, is_global);
             continue;
         }
 

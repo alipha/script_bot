@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <stack>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -55,7 +56,7 @@ public:
     }
     void append(std::string_view token, const operation_type &op_type, op_code code);
 
-    void append_operand(std::string_view token);
+    void append_operand(std::string_view token, bool is_global);
     void append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens);
 
     void reset(const std::vector<std::string_view> &params);
@@ -110,8 +111,8 @@ void bytecode_builder::append(std::string_view token, const operation_type &op_t
     impl->append(token, op_type, code);
 }
 
-void bytecode_builder::append_operand(std::string_view token) {
-    impl->append_operand(token);
+void bytecode_builder::append_operand(std::string_view token, bool is_global) {
+    impl->append_operand(token, is_global);
 }
     
 void bytecode_builder::append_operand(std::shared_ptr<func_def> func, const std::string &func_tokens) {
@@ -184,6 +185,10 @@ void builder_impl::append(std::string_view token, const operation_type &op_type,
         result.append(parse_str_literal(token));
         break;
     case op_code::global_var:
+        if(token.size() == 1)
+            throw std::runtime_error("global variables must be more than one letter");
+        if(token[0] == '$')
+            throw std::runtime_error("global variables cannot begin with $");
         result.append(token);
         break;
     case op_code::local_var:
@@ -207,11 +212,11 @@ void builder_impl::append(std::string_view token, const operation_type &op_type,
 }
 
 
-void builder_impl::append_operand(std::string_view token) {
+void builder_impl::append_operand(std::string_view token, bool is_global) {
     if(token == "null")
         append(token, op_code::null_lit);
     else if(tokenizer::is_identifier(token[0]))
-        append(token, op_code::local_var);    // TODO: global_var
+        append(token, is_global ? op_code::global_var : op_code::local_var);
     else if(token[0] == '"' || token[0] == '\'') // TODO: char?
         append(token, op_code::str_lit);
     else if(std::isdigit(token[0]) && (token.back() == 'u' || token.back() == 'U'))
@@ -316,10 +321,8 @@ std::uint8_t builder_impl::get_or_add_index(std::string_view name) {
     auto this_it = std::find_if(parents->begin(), parents->end(), 
             [this](auto &parent) { return parent.impl.get() == this; });
 
-    if constexpr(debug) {
-        if(this_it == parents->end())
-            throw std::logic_error("builder is not in parents!");
-    }
+    if(debug && this_it == parents->end())
+        throw std::logic_error("builder is not in parents!");
 
     // find which parent (or grandparent, etc) builder has the local variable or capture
     auto it = std::find_if(std::next(this_it), parents->end(),
@@ -334,10 +337,8 @@ std::uint8_t builder_impl::get_or_add_index(std::string_view name) {
         return local_var_indexes[name] = next_index;
     }
 
-    if constexpr(debug) {
-        if(!index.has_value())
-            throw std::logic_error("index expected to have a value");
-    }
+    if(debug && !index.has_value())
+        throw std::logic_error("index expected to have a value");
 
     // add the variable as a capture for each child
     while(it != this_it) {

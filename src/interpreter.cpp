@@ -192,7 +192,8 @@ void interpreter_impl::execute_op_code(program_state &state) {
             operands->pop();
         break;*/
     case op_code::global_var:
-        throw std::logic_error("global_var is currently unsupported");
+        operands->push_back(object(mem->get_or_add_global(std::string(buffer.read_str()))));
+        break;
     case op_code::local_var:
         operands->push_back(object(mem->get_local_var(*buffer.read<std::uint8_t>())));
         break;

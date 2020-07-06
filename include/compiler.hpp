@@ -22,7 +22,7 @@ public:
     compiler &operator=(const compiler &) = delete;
     compiler &operator=(compiler &&) = delete;
 
-    std::shared_ptr<func_def> compile(std::vector<symbol> token_list, const std::string &source);
+    std::shared_ptr<func_def> compile(std::vector<symbol> token_list, const std::string &source, bool persist_vars);
 
     const std::string &tokenized() const;
 

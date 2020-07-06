@@ -37,10 +37,10 @@ std::string to_hex(const gcvector<std::uint8_t> &bytes) {
 }
 
 
-std::string run(compiler &c, interpreter &i, std::string_view code) {
+std::string run(compiler &c, interpreter &i, std::string_view code, bool persist) {
     try {
         tokenizer t(std::string(code.data(), code.size()));
-        return i.execute(c.compile(t.tokens(), t.source()));
+        return i.execute(c.compile(t.tokens(), t.source(), persist));
     } catch(std::exception &e) {
         return "Error: "s + e.what();
     }
@@ -61,9 +61,9 @@ void run_irc(settings &s, compiler &c, interpreter &i) {
             irc.write(msg.message());
             if(starts_with(msg.message(), "QUIT"))
                 return;
-        } else if(starts_with(msg.message(), "!calc ")) {
+        } else if(starts_with(msg.message(), "!run ") || starts_with(msg.message(), "!set ")) {
             irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": " + 
-                    run(c, i, msg.message().substr(6)));
+                    run(c, i, msg.message().substr(5), starts_with(msg.message(), "!set ")));
             std::size_t mem_used = gc::get_memory_used();
             if(mem_used > 0)
                 std::cout << "Memory Used: " << mem_used << std::endl;
@@ -111,13 +111,17 @@ int main(int argc, char* argv[]) {
             if(line == "quit")
                 return 0;
 
+            bool make_global = starts_with(line, "!set ");
+            if(make_global)
+                line = line.substr(5);
+
             tokenizer t(std::move(line));
             for(symbol token : t.tokens())
                 std::cout << '"' << token.token << '"' << std::endl;
 
             std::cout << std::endl;
 
-            std::shared_ptr<func_def> code = c.compile(t.tokens(), t.source());
+            std::shared_ptr<func_def> code = c.compile(t.tokens(), t.source(), make_global);
 
             std::cout << c.tokenized() << std::endl;
             std::cout << to_hex(code->code.buffer()) << std::endl;

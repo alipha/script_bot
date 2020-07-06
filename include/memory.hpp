@@ -43,7 +43,9 @@ public:
     
     std::size_t call_depth() const { return frame_stack->size(); }
 
-    var_ref get_local_var(std::size_t index);
+    var_ref get_local_var(std::size_t index) const;
+    var_ref get_or_add_global(const std::string &name);
+    bool has_global(const std::string &name) const;
 
     void push_temp(object temp) { temps_stack->push_back(std::move(temp)); }
 

@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+
 void memory::push_frame(std::size_t current_pos, std::size_t current_operand_count, func_ref func, array_ref params) {
     gc::anchor_ptr<func_type> func_anchor = func;
     gc::anchor_ptr<gcvector<object>> params_anchor = params;
@@ -60,7 +61,7 @@ void memory::clear_stack() {
 }
 
 
-var_ref memory::get_local_var(std::size_t index) {
+var_ref memory::get_local_var(std::size_t index) const {
     if(debug && frame_stack->empty())
         debug_throw("get_local_var: frame_stack empty!");
 
@@ -99,3 +100,15 @@ var_ref memory::get_local_var(std::size_t index) {
     }
 }
 
+
+var_ref memory::get_or_add_global(const std::string &name) {
+    if(auto it = globals->find(name); it != globals->end())
+        return it->second;
+    else
+        return globals->try_emplace(name, make_lvalue()).first->second;
+}
+
+
+bool memory::has_global(const std::string &name) const {
+    return globals->count(name);
+}
