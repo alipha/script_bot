@@ -116,8 +116,8 @@ int main(int argc, char* argv[]) {
                 line = line.substr(5);
 
             tokenizer t(std::move(line));
-            for(symbol token : t.tokens())
-                std::cout << '"' << token.token << '"' << std::endl;
+            //for(symbol token : t.tokens())
+            //    std::cout << '"' << token.token << '"' << std::endl;
 
             std::cout << std::endl;
 

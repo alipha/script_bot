@@ -25,7 +25,7 @@ bool unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std
     if(code == op_code::semicolon || code == op_code::ret) {
         //std::cout << "semicolon: " << operands.size() << ", " << parent_operand_count << std::endl;
         if(operands.size() > parent_operand_count)
-            last_value = pop(operands);
+            last_value = to_variant<object::type>(pop(operands)->value());  // TODO: make last_value gc::anchor<object::value_type>?
         //operands.clear();   // TODO: should i do this?
         return code == op_code::ret;
     }
