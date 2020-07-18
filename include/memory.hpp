@@ -38,6 +38,8 @@ public:
     void push_frame(std::size_t current_pos, std::size_t current_operand_count, func_ref func, array_ref params);
     std::size_t pop_frame();
     void clear_stack();
+
+    void reset();
    
     frame &current_frame() { return frame_stack->back(); }
     
@@ -46,6 +48,8 @@ public:
     var_ref get_local_var(std::size_t index) const;
     var_ref get_or_add_global(const std::string &name);
     bool has_global(const std::string &name) const;
+
+    const std::unordered_map<std::string, var_ref> &get_globals() const { return *globals; }
 
     void push_temp(object temp) { temps_stack->push_back(std::move(temp)); }
 

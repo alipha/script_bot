@@ -55,11 +55,16 @@ std::size_t memory::pop_frame() {
 
 
 void memory::clear_stack() {
-    temps_stack->clear();
-    local_var_stack->clear();
-    frame_stack->clear();
+    *temps_stack = {};
+    *local_var_stack = {};
+    *frame_stack = {};
 }
 
+
+void memory::reset() {
+    clear_stack();
+    *globals = {};
+}
 
 var_ref memory::get_local_var(std::size_t index) const {
     if(debug && frame_stack->empty())

@@ -67,6 +67,8 @@ private:
     template<typename T>
     void write_ref(std::ostream &os, const T &value);
 
+    void write_ref(std::ostream &os, const object &obj);
+
     template<typename T>
     std::optional<T> read(std::istream &is);
 
@@ -109,19 +111,20 @@ void serializer_impl::serialize(const std::string &filename) {
     needs_saving.clear();
     objects_by_addr.clear();
 
+    auto &globals = mem->get_globals();
     std::ofstream os(filename);
     if(!os)
         throw std::runtime_error("unable to open file for writing: " + filename);
 
-    write<std::size_t>(os, globals->size());
-    for(auto &[name, obj_ref] : *globals) {
+    write<std::size_t>(os, globals.size());
+    for(auto &[name, obj_ref] : globals) {
         write(os, name);
         write_ref(os, *obj_ref);
     }
 
     while(!needs_saving.empty()) {
         std::uintptr_t addr = needs_saving.front();
-        needs_saving.pop();
+        needs_saving.pop_front();
 
         if(debug && objects_by_addr.find(addr) == objects_by_addr.end())
             throw std::logic_error("addr is not in objects_by_addr");
@@ -143,11 +146,12 @@ void serializer_impl::deserialize(const std::string &filename) {
         throw std::runtime_error("unable to open file for reading: " + filename);
 
     std::size_t global_count = read_or_throw<std::size_t>(is);
+    mem->reset();
+    gc::collect();
 
     for(std::size_t i = 0; i < global_count; ++i) {
         std::string name = read_str<std::string>(is);
-        var_ref lvalue = make_lvalue();
-        globals.try_emplace(std::move(name), lvalue);
+        var_ref lvalue = mem->get_or_add_global(name);
 
         read_ref_to(is, lvalue.get());
     } 
@@ -160,7 +164,7 @@ void serializer_impl::deserialize(const std::string &filename) {
     }
 
     while(!needs_loading.empty()) {
-        [addr, ref] = *needs_loading.begin();
+        auto [addr, ref] = *needs_loading.begin();
         if(debug && objects_by_addr.find(addr) == objects_by_addr.end())
             throw std::logic_error("objects_by_addr doesn't contain addr");
         *ref = objects_by_addr[addr];
@@ -174,7 +178,7 @@ void serializer_impl::deserialize(const std::string &filename) {
 
 template<typename T>
 void serializer_impl::write(std::ostream &os, const T &value) {
-    if(!os.write(reinterpret_cast<char*>(&value), sizeof value))
+    if(!os.write(reinterpret_cast<const char*>(&value), sizeof value))
         throw std::runtime_error("error writing to file");
 }
 
@@ -204,42 +208,51 @@ void serializer_impl::write(std::ostream &os, const map_ref &map) {
 }
 
 void serializer_impl::write(std::ostream &os, const func_ref &func) {
-    gcvector<std::uint8_t> &code = func->code.buffer();
+    (void)os;
+    (void)func;
+    /*gcvector<std::uint8_t> &code = func->code.buffer();
     write(os, static_cast<std::uint32_t>(code.size()));
-    if(!os.write(code.data(), code.size()))
+    if(!os.write(reinterpret_cast<char*>(code.data()), code.size()))
         throw std::runtime_error("error writing function to file");
-    // TODO: func_defs are shared
+*/    // TODO: func_defs are shared
 }
 
-void serializer_impl::write(std::ostream &os, const std::monostate &nul) {}
+void serializer_impl::write(std::ostream &, const std::monostate &) {}
     
 
 template<typename T>
 void serializer_impl::write_ref(std::ostream &os, const T &value) {
-    if constexpr(std::is_same_v<T, std::int64_t> || std::is_same_v<T, std::uint64_t>
+    if constexpr(std::is_same_v<T, std::monostate>) {
+        // do nothing
+    } else if constexpr(std::is_same_v<T, std::int64_t> || std::is_same_v<T, std::uint64_t>
             || std::is_same_v<T, double>) {
         write(os, value);
-    } else if constexpr(!std::is_same_v<T, std::monostate>) {
+    } else if constexpr(std::is_same_v<T, string_ref> || std::is_same_v<T, array_ref>
+            || std::is_same_v<T, map_ref> || std::is_same_v<T, func_ref>) { 
         std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(value.get());
         if(auto [it, inserted] = objects_by_addr.try_emplace(addr, value); inserted)
             needs_saving.push_back(addr);
 
         write(os, addr);
+    } else if constexpr(std::is_same_v<T, var_ref> || std::is_same_v<T, lvalue_ref>) {
+        throw std::logic_error("write_ref: value shouldn't be var_ref or lvalue_ref");
+    } else {
+        static_assert(sizeof(T) && false, "unknown object variant type");
     }
 }
     
 void serializer_impl::write(std::ostream &os, const object &obj) {
-    if(debug && obj.get().index() >= object_type::count)
+    if(debug && obj.get().index() >= static_cast<std::size_t>(object_type::count))
         debug_throw("write: unexpected variant value: " + std::to_string(obj.get().index()));
     write(os, obj.get().index());
-    std::visit([](auto &value) { write(os, value); }, obj);
+    std::visit([this, &os](const auto &value) { write(os, value); }, obj.get());
 }
 
 void serializer_impl::write_ref(std::ostream &os, const object &obj) {
-    if(debug && obj.get().index() >= object_type::count)
+    if(debug && obj.get().index() >= static_cast<std::size_t>(object_type::count))
         debug_throw("write_ref: unexpected variant value: " + std::to_string(obj.get().index()));
     write(os, obj.get().index());
-    std::visit([](auto &value) { write_ref(os, value); }, obj);
+    std::visit([this, &os](const auto &value) { write_ref(os, value); }, obj.get());
 }
 
 
@@ -304,7 +317,7 @@ object serializer_impl::read_object(std::istream &is) {
     std::uint32_t size;
 
     switch(type) {
-    case object_type::string: return make_string(read_str<gcstring>(is));
+    case object_type::string: return object::type(make_string(read_str<gcstring>(is)));
     case object_type::array: {
         size = read_or_throw<std::uint32_t>(is);
 
@@ -314,7 +327,7 @@ object serializer_impl::read_object(std::istream &is) {
         for(object &obj : *array)
             read_ref_to(is, &obj);
             
-        return array;
+        return object::type(array);
     }
     case object_type::map: {
         size = read_or_throw<std::uint32_t>(is);
@@ -326,7 +339,7 @@ object serializer_impl::read_object(std::istream &is) {
             read_ref_to(is, &it->second);
         }
 
-        return map;
+        return object::type(map);
     }
     case object_type::func: {
         /* todo */
