@@ -1,5 +1,6 @@
 #include "compiler.hpp"
 #include "bytecode_builder.hpp"
+#include "cleanup.hpp"
 #include "debug.hpp"
 #include "memory.hpp"
 #include "operation_type.hpp"
@@ -26,7 +27,7 @@ using namespace std::string_literals;
 
 class compiler_impl {
 public:
-    compiler_impl(memory *m, bool generate_tokenized) : mem(m), gen_tokenized(generate_tokenized) {}
+    compiler_impl(memory *m, bool generate_tokenized) : mem(m), gen_tokenized(generate_tokenized), last_code(op_code::none), last_type() {}
 
     // non-movable because the builders' parents pointers will end up pointing to the wrong parents
     compiler_impl(const compiler_impl &) = delete;
@@ -286,7 +287,7 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
 
 
 std::shared_ptr<func_def> compiler_impl::compile(std::vector<symbol> token_list, const std::string &source, bool persist_vars) {
-    reset();
+    cleanup c = [this]() { this->reset(); };
     builders.emplace_front(mem, 0, &builders, &op_codes, gen_tokenized, std::vector<std::string_view>());
 
     source_text = source + ';';

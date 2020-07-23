@@ -9,6 +9,19 @@ class memory;
 class serializer_impl;
 
 
+enum class object_type : std::uint8_t {
+    nul,
+    int64,
+    uint64,
+    float8,
+    string,
+    array,
+    map,
+    func,
+    count
+};
+
+
 class serializer {
 public:
     serializer(memory *m);

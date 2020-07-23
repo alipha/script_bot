@@ -1,4 +1,5 @@
 #include "interpreter.hpp"
+#include "cleanup.hpp"
 #include "debug.hpp"
 #include "conversion.hpp"
 #include "executor.hpp"
@@ -120,6 +121,11 @@ void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, op_code co
 
 
 std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
+    cleanup c = [this]() {
+        this->operands->clear();
+        this->mem->clear_stack();
+    };
+
     std::size_t position = 0;
     func_ref func = gc::make_ptr<func_type>(std::move(program), gcvector<var_ref>());
     last_value = object::type(std::monostate());
