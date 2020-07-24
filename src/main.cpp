@@ -4,6 +4,7 @@
 #include "irc.hpp"
 #include "memory.hpp"
 #include "object.hpp"
+#include "serializer.hpp"
 #include "settings.hpp"
 #include "string_util.hpp"
 #include "tokenizer.hpp"
@@ -47,8 +48,8 @@ std::string run(compiler &c, interpreter &i, std::string_view code, bool persist
 }
 
 
-void run_irc(settings &s, compiler &c, interpreter &i) {
-    irc_client irc(s);
+void run_irc(settings &setting, compiler &c, interpreter &i, serializer &s) {
+    irc_client irc(setting);
     irc.login();
 
     while(true) {
@@ -61,6 +62,22 @@ void run_irc(settings &s, compiler &c, interpreter &i) {
             irc.write(msg.message());
             if(starts_with(msg.message(), "QUIT"))
                 return;
+        } else if(msg.message() == "!save") {
+            try {
+                s.serialize("memory.dat");
+                irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": bot state saved");
+            } catch(std::exception &e) {
+                irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": error saving state: "
+                        + e.what());
+            }
+        } else if(msg.message() == "!load") {
+            try {
+                s.deserialize("memory.dat");
+                irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": bot state loaded");
+            } catch(std::exception &e) {
+                irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": error loading state: "
+                        + e.what());
+            }
         } else if(starts_with(msg.message(), "!run ") || starts_with(msg.message(), "!set ")) {
             irc.write("PRIVMSG "s + msg.target() + " :" + msg.sender_nick() + ": " + 
                     run(c, i, msg.message().substr(5), starts_with(msg.message(), "!set ")));
@@ -76,6 +93,7 @@ int main(int argc, char* argv[]) {
     settings setting("settings.txt");
     memory m;
     compiler c(&m, true);
+    serializer s(&m);
 
     std::string_view max_depth = setting.first("max_call_depth").value_or("1000");
     interpreter i(&m, std::stoul(std::string(max_depth)));
@@ -89,7 +107,7 @@ int main(int argc, char* argv[]) {
         while(true) {
             try {
                 start_time = std::time(nullptr);
-                run_irc(setting, c, i);
+                run_irc(setting, c, i, s);
                 return 0;
             } catch(boost::system::system_error &e) {
                 std::cerr << "boost exception: " << e.what() << std::endl;
@@ -111,6 +129,20 @@ int main(int argc, char* argv[]) {
             if(line == "quit")
                 return 0;
 
+            if(starts_with(line, "!save ")) {
+                std::string filename = line.substr(6);
+                s.serialize(filename);
+                std::cout << "Saved to file: " << filename << std::endl;
+                continue;
+            }
+
+            if(starts_with(line, "!load ")) {
+                std::string filename = line.substr(6);
+                s.deserialize(filename);
+                std::cout << "Loaded file: " << filename << std::endl;
+                continue;
+            }
+
             bool make_global = starts_with(line, "!set ");
             if(make_global)
                 line = line.substr(5);
@@ -120,7 +152,6 @@ int main(int argc, char* argv[]) {
             //    std::cout << '"' << token.token << '"' << std::endl;
 
             std::cout << std::endl;
-
             std::shared_ptr<func_def> code = c.compile(t.tokens(), t.source(), make_global);
 
             std::cout << c.tokenized() << std::endl;

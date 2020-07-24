@@ -42,3 +42,6 @@
 *.out
 *.app
 script_bot
+
+# Memory dumps
+*.dat

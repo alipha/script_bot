@@ -101,7 +101,7 @@ public:
     }
 
     void clear() {
-        buf.clear();
+        buf = {};
         pos = 0;
     }
     

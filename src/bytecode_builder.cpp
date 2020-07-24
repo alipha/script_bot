@@ -242,13 +242,13 @@ void builder_impl::append_operand(std::shared_ptr<func_def> func, const std::str
 
 // TODO: remove and put the appends in the ctor?
 void builder_impl::reset(const std::vector<std::string_view> &params) {
-    func_lits.clear();
-    local_var_indexes.clear();
-    capture_indexes.clear();
+    func_lits = {};
+    local_var_indexes = {};
+    capture_indexes = {};
     jump_indexes = {};
     while_indexes = {};
-    result.clear();
-    tokenized_result.clear();
+    result = {};
+    tokenized_result = {};
 
     result.append(static_cast<std::uint8_t>(params.size()));
     result.append(static_cast<std::uint8_t>(0));

@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 
 class reader {
@@ -22,7 +23,14 @@ public:
     reader &operator=(reader &&) = delete;
     
     void open(const std::string &filename);
-    void close() { is.close(); }
+    void close();
+    
+    object get_object(std::uintptr_t addr);
+    void add_object_ref(std::uintptr_t addr, object &&obj);
+
+    std::pair<std::uintptr_t, lvalue_ref> next_to_load();
+
+    bool has_needs_loading() const { return !needs_loading.empty(); }
 
     template<typename T>
     std::optional<T> read() {
@@ -37,7 +45,7 @@ public:
 
     template<typename T>
     T read_or_throw() {
-        if(std::optional<T> value = read<T>(is); value)
+        if(std::optional<T> value = read<T>(); value)
             return *value;
         else
             throw std::runtime_error("unexpected end of file");
@@ -45,7 +53,7 @@ public:
 
     template<typename String>
     String read_str() {
-        std::uint32_t size = read_or_throw<std::uint32_t>(is);
+        std::uint32_t size = read_or_throw<std::uint32_t>();
         String str(size, '\0');
         if(!is.read(str.data(), size) || is.gcount() != size)
             throw std::runtime_error("unable to read string of size " + std::to_string(size));

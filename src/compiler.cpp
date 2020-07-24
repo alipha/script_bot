@@ -54,13 +54,17 @@ private:
     bool pop_op_codes(std::string_view token, mut<operation_type> op_type_ref, mut<std::size_t> index);
 
 
-    void reset() {
+    void reset(bool clear_builders) {
         op_codes = {};
         last_code = op_code::none;
         last_type = {};
-        tokens.clear();
-        source_text.clear();
-        builders.clear();
+        tokens = {};
+        source_text = {};
+
+        if(clear_builders) {
+            builders.clear();
+            builders.shrink_to_fit();
+        }
     }
 
     memory *mem;
@@ -287,7 +291,7 @@ bool compiler_impl::pop_op_codes(std::string_view token, mut<operation_type> op_
 
 
 std::shared_ptr<func_def> compiler_impl::compile(std::vector<symbol> token_list, const std::string &source, bool persist_vars) {
-    cleanup c = [this]() { this->reset(); };
+    cleanup c = [this]() { this->reset(false); };
     builders.emplace_front(mem, 0, &builders, &op_codes, gen_tokenized, std::vector<std::string_view>());
 
     source_text = source + ';';

@@ -2,15 +2,15 @@
 #define LIPH_WRITER_HPP
 
 #include "object.hpp"
-#include "serializer.hpp"
 
 #include <cstdint>
 #include <deque>
 #include <fstream>
-#include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
 
 
 class writer {
@@ -23,48 +23,46 @@ public:
     writer &operator=(writer &&) = delete;
     
     void open(const std::string &filename);
-    void close() { is.close(); }
+    void close();
 
+    bool has_needs_saving() const { return !needs_saving.empty(); }
 
-template<typename T>
-void serializer_impl::write(std::ostream &os, const T &value) {
-    if(!os.write(reinterpret_cast<const char*>(&value), sizeof value))
-        throw std::runtime_error("error writing to file");
-}
+    std::pair<std::uintptr_t, object&> next_to_save();
 
-template<typename... Args>
-void serializer_impl::write(std::ostream &os, const std::basic_string<Args...> &str) {
-    write(os, static_cast<std::uint32_t>(str.size()));
-    if(!os.write(str.data(), str.size()))
-        throw std::runtime_error("error writing string to file");
-}
-
-template<typename T>
-void serializer_impl::write_ref(std::ostream &os, const T &value) {
-    if constexpr(std::is_same_v<T, std::monostate>) {
-        // do nothing
-    } else if constexpr(std::is_same_v<T, std::int64_t> || std::is_same_v<T, std::uint64_t>
-            || std::is_same_v<T, double>) {
-        write(os, value);
-    } else if constexpr(std::is_same_v<T, string_ref> || std::is_same_v<T, array_ref>
-            || std::is_same_v<T, map_ref> || std::is_same_v<T, func_ref>) { 
-        std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(value.get());
-        if(auto [it, inserted] = objects_by_addr.try_emplace(addr, value); inserted)
-            needs_saving.push_back(addr);
-
-        write(os, addr);
-    } else if constexpr(std::is_same_v<T, var_ref> || std::is_same_v<T, lvalue_ref>) {
-        throw std::logic_error("write_ref: value shouldn't be var_ref or lvalue_ref");
-    } else {
-        static_assert(sizeof(T) && false, "unknown object variant type");
-    }
-}
 
     template<typename T>
-    void write(const T &value);
+    void write(const T &value) {
+        if(!os.write(reinterpret_cast<const char*>(&value), sizeof value))
+            throw std::runtime_error("error writing to file");
+    }
 
     template<typename... Args>
-    void write(const std::basic_string<Args...> &str);
+    void write(const std::basic_string<Args...> &str) {
+        write(static_cast<std::uint32_t>(str.size()));
+        if(!os.write(str.data(), str.size()))
+            throw std::runtime_error("error writing string to file");
+    }
+
+    template<typename T>
+    void write_ref(const T &value) {
+        if constexpr(std::is_same_v<T, std::monostate>) {
+            // do nothing
+        } else if constexpr(std::is_same_v<T, std::int64_t> || std::is_same_v<T, std::uint64_t>
+                || std::is_same_v<T, double>) {
+            write(value);
+        } else if constexpr(std::is_same_v<T, string_ref> || std::is_same_v<T, array_ref>
+                || std::is_same_v<T, map_ref> || std::is_same_v<T, func_ref>) { 
+            std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(value.get());
+            if(auto [it, inserted] = objects_by_addr.try_emplace(addr, value); inserted)
+                needs_saving.push_back(addr);
+
+            write(addr);
+        } else if constexpr(std::is_same_v<T, var_ref> || std::is_same_v<T, lvalue_ref>) {
+            throw std::logic_error("write_ref: value shouldn't be var_ref or lvalue_ref");
+        } else {
+            static_assert(sizeof(T) && false, "unknown object variant type");
+        }
+    }
 
     void write(const string_ref &str);
     void write(const array_ref &array);
@@ -72,9 +70,6 @@ void serializer_impl::write_ref(std::ostream &os, const T &value) {
     void write(const func_ref &func);
     void write(const std::monostate &nul);
     void write(const object &obj);
-
-    template<typename T>
-    void write_ref(const T &value);
 
     void write_ref(const object &obj);
 

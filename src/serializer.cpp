@@ -1,23 +1,20 @@
 #include "serializer.hpp"
 #include "cleanup.hpp"
-#include "debug.hpp"
 #include "gc.hpp"
 #include "memory.hpp"
 #include "object.hpp"
 #include "reader.hpp"
-#include "variant_util.hpp"
 #include "writer.hpp"
 
 #include <cstdint>
+#include <cstddef>
 #include <deque>
-#include <fstream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <variant>
-#include <vector>
+#include <utility>
 
 /*
 template<typename T, typename MakeExceptFunc>
@@ -63,68 +60,49 @@ void serializer::deserialize(const std::string &filename) {
 
 
 void serializer_impl::serialize(const std::string &filename) {
-	cleanup c = [this]() {
-    	this->needs_saving = {};
-    	this->objects_by_addr = {};
-	};
+	cleanup c = [this]() { this->w.close(); };
 
     auto &globals = mem->get_globals();
-    std::ofstream os(filename);
-    if(!os)
-        throw std::runtime_error("unable to open file for writing: " + filename);
+    w.open(filename);
 
-    write<std::size_t>(os, globals.size());
+    w.write<std::size_t>(globals.size());
     for(auto &[name, obj_ref] : globals) {
-        write(os, name);
-        write_ref(os, *obj_ref);
+        w.write(name);
+        w.write_ref(*obj_ref);
     }
 
-    while(!needs_saving.empty()) {
-        std::uintptr_t addr = needs_saving.front();
-        needs_saving.pop_front();
-
-        if(debug && objects_by_addr.find(addr) == objects_by_addr.end())
-            throw std::logic_error("addr is not in objects_by_addr");
-        write(os, addr);
-        write(os, objects_by_addr[addr]);
+    while(w.has_needs_saving()) {
+        const auto& [addr, object] = w.next_to_save();
+        w.write(addr);
+        w.write(object);
     }
 }
 
 
 void serializer_impl::deserialize(const std::string &filename) {
-	cleanup c = [this]() {
-    	this->needs_loading = {};
-    	this->objects_by_addr = {};
-	};
+	cleanup c = [this]() { this->r.close(); };
 
-    std::ifstream is(filename);
-    if(!is)
-        throw std::runtime_error("unable to open file for reading: " + filename);
+    r.open(filename);
 
-    std::size_t global_count = read_or_throw<std::size_t>(is);
+    std::size_t global_count = r.read_or_throw<std::size_t>();
     mem->reset();
     gc::collect();
 
     for(std::size_t i = 0; i < global_count; ++i) {
-        std::string name = read_str<std::string>(is);
+        std::string name = r.read_str<std::string>();
         var_ref lvalue = mem->get_or_add_global(name);
 
-        read_ref_to(is, lvalue.get());
+        r.read_ref_to(lvalue.get());
     } 
 
-    while(std::uintptr_t addr = read<std::uintptr_t>(is).value_or(0)) {
-        object obj = read_object(is);
-        if(debug && objects_by_addr.find(addr) != objects_by_addr.end())
-            throw std::logic_error("objects_by_addr already contains addr");
-        objects_by_addr[addr] = obj;
+    while(std::uintptr_t addr = r.read<std::uintptr_t>().value_or(0)) {
+        object obj = r.read_object();
+        r.add_object_ref(addr, std::move(obj));
     }
 
-    while(!needs_loading.empty()) {
-        auto [addr, ref] = *needs_loading.begin();
-        if(debug && objects_by_addr.find(addr) == objects_by_addr.end())
-            throw std::logic_error("objects_by_addr doesn't contain addr");
-        *ref = objects_by_addr[addr];
-        needs_loading.erase(needs_loading.begin());
+    while(r.has_needs_loading()) {
+        auto [addr, ref] = r.next_to_load();
+        *ref = r.get_object(addr);
     }
 }
  

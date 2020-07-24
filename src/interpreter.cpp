@@ -122,7 +122,7 @@ void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, op_code co
 
 std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
     cleanup c = [this]() {
-        this->operands->clear();
+        *this->operands = {};
         this->mem->clear_stack();
     };
 
@@ -131,8 +131,6 @@ std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
     last_value = object::type(std::monostate());
    
     parent_operand_count = 0; 
-    operands->clear();
-    mem->clear_stack();
     mem->push_frame(no_parent, 0, func, make_array());
 
     program_state state = {
