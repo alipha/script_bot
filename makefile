@@ -1,4 +1,4 @@
-CXX      := g++-8
+CXX      := g++
 CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror -Wno-psabi -std=c++17 -march=native
 LDFLAGS  := -pthread -lboost_system
 BUILD    := build

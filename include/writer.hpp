@@ -2,6 +2,7 @@
 #define LIPH_WRITER_HPP
 
 #include "object.hpp"
+#include "serializer.hpp"
 
 #include <cstdint>
 #include <deque>
@@ -74,6 +75,8 @@ public:
     void write_ref(const object &obj);
 
 private:
+    object_type get_type(const object &obj);
+
     std::ofstream os;
     std::deque<std::uintptr_t> needs_saving;
     std::unordered_map<std::uintptr_t, object> objects_by_addr;

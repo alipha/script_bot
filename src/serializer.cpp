@@ -65,7 +65,7 @@ void serializer_impl::serialize(const std::string &filename) {
     auto &globals = mem->get_globals();
     w.open(filename);
 
-    w.write<std::size_t>(globals.size());
+    w.write<std::uint32_t>(globals.size());
     for(auto &[name, obj_ref] : globals) {
         w.write(name);
         w.write_ref(*obj_ref);
@@ -84,7 +84,7 @@ void serializer_impl::deserialize(const std::string &filename) {
 
     r.open(filename);
 
-    std::size_t global_count = r.read_or_throw<std::size_t>();
+    std::size_t global_count = r.read_or_throw<std::uint32_t>();
     mem->reset();
     gc::collect();
 

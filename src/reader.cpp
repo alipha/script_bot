@@ -1,5 +1,4 @@
 #include "reader.hpp"
-#include "debug.hpp"
 #include "object.hpp"
 #include "serializer.hpp"
 
@@ -28,15 +27,15 @@ void reader::close() {
 
 
 object reader::get_object(std::uintptr_t addr) {
-    if(debug && objects_by_addr.find(addr) == objects_by_addr.end())
-        throw std::logic_error("objects_by_addr doesn't contain addr");
+    if(objects_by_addr.find(addr) == objects_by_addr.end())
+        throw std::runtime_error("objects_by_addr doesn't contain addr");
     return objects_by_addr[addr];
 }
 
 
 void reader::add_object_ref(std::uintptr_t addr, object &&obj) {
-    if(debug && objects_by_addr.find(addr) != objects_by_addr.end())
-        throw std::logic_error("objects_by_addr already contains addr");
+    if(objects_by_addr.find(addr) != objects_by_addr.end())
+        throw std::runtime_error("objects_by_addr already contains addr");
     objects_by_addr.try_emplace(addr, std::move(obj));
 }
     
