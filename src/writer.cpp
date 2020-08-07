@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <fstream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -38,6 +39,13 @@ std::pair<std::uintptr_t, object&> writer::next_to_save() {
 
    return {addr, objects_by_addr[addr]}; 
 }
+    
+
+const func_def *writer::next_func_to_save() {
+    const func_def *func = funcs_need_saving.front();
+    funcs_need_saving.pop_front();
+    return func;
+}
 
 
 void writer::write(const string_ref &str) {
@@ -62,13 +70,11 @@ void writer::write(const map_ref &map) {
 
 
 void writer::write(const func_ref &func) {
-    (void)os;
-    (void)func;
-    /*gcvector<std::uint8_t> &code = func->code.buffer();
-    write(os, static_cast<std::uint32_t>(code.size()));
-    if(!os.write(reinterpret_cast<char*>(code.data()), code.size()))
-        throw std::runtime_error("error writing function to file");
-*/    // TODO: func_defs are shared
+    write_func_def_ref(*func->definition);
+
+    write(static_cast<std::uint8_t>(func->captures.size()));
+    for(var_ref capture : func->captures)
+        write_ref(*capture, true);
 }
 
 
@@ -81,9 +87,33 @@ void writer::write(const object &obj) {
 }
 
 
-void writer::write_ref(const object &obj) {
+void writer::write_func_def(const func_def &func) {
+    const gcvector<std::uint8_t> &code = func.code.buffer();
+    write(static_cast<std::uint32_t>(code.size()));
+    if(!os.write(reinterpret_cast<const char*>(code.data()), code.size()))
+        throw std::runtime_error("error writing function to file");
+
+    write(static_cast<std::uint8_t>(func.func_lits.size()));
+    for(const std::shared_ptr<func_def> &lit : func.func_lits)
+        write_func_def_ref(*lit);
+    
+    write(func.source_text);
+}
+
+
+void writer::write_func_def_ref(const func_def &func) {
+    if(func_defs.insert(&func).second)
+        funcs_need_saving.push_back(&func);
+    write(reinterpret_cast<std::uint64_t>(&func));
+}
+
+
+void writer::write_ref(const object &obj, bool force_ref) {
     write(static_cast<std::uint8_t>(get_type(obj)));
-    std::visit([this](const auto &value) { write_ref(value); }, obj.value());
+
+    std::visit([this, &obj, force_ref](const auto &value) { 
+        write_ref(value, force_ref ? &obj : nullptr);
+    }, obj.value());
 }
     
 

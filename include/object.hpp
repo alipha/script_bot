@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -93,6 +94,29 @@ inline gc::anchor<object> pop(std::vector<object> &v) {
     gc::anchor<object> value = std::move(v.back());
     v.pop_back();
     return value;
+}
+
+
+template<typename T>
+constexpr bool is_non_ref() {
+    if constexpr(std::is_same_v<T, std::monostate> 
+            || std::is_same_v<T, std::int64_t> 
+            || std::is_same_v<T, std::uint64_t>
+            || std::is_same_v<T, double>)
+        return true;
+    else
+        return false;
+}
+
+template<typename T>
+constexpr bool is_ref() {
+    if constexpr(std::is_same_v<T, string_ref> 
+            || std::is_same_v<T, array_ref>
+            || std::is_same_v<T, map_ref>
+            || std::is_same_v<T, func_ref>)
+        return true;
+    else
+        return false;
 }
 
 

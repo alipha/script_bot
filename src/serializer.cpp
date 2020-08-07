@@ -76,6 +76,14 @@ void serializer_impl::serialize(const std::string &filename) {
         w.write(addr);
         w.write(object);
     }
+
+    w.write(static_cast<std::uintptr_t>(0));
+    
+    while(w.has_funcs_need_saving()) {
+        const func_def *func = w.next_func_to_save();
+        w.write(reinterpret_cast<std::uintptr_t>(func));
+        w.write_func_def(*func);
+    }
 }
 
 
@@ -95,7 +103,7 @@ void serializer_impl::deserialize(const std::string &filename) {
         r.read_ref_to(lvalue.get());
     } 
 
-    while(std::uintptr_t addr = r.read<std::uintptr_t>().value_or(0)) {
+    while(std::uintptr_t addr = r.read_or_throw<std::uintptr_t>()) {
         object obj = r.read_object();
         r.add_object_ref(addr, std::move(obj));
     }
@@ -104,5 +112,14 @@ void serializer_impl::deserialize(const std::string &filename) {
         auto [addr, ref] = r.next_to_load();
         *ref = r.get_object(addr);
     }
+
+    // TODO: populate funcs_need_loading
+
+    /*
+    while(r.has_funcs_need_loading()) {
+        auto [addr, ref] = r.next_func_to_load();
+        *ref = r.get_func_def(addr);
+    }
+    */
 }
  
