@@ -33,7 +33,7 @@ object index_op(memory *mem, const object &left, const object &right) {
             if(index < 0 || static_cast<std::size_t>(index) >= l->size())
                 throw std::runtime_error("array index out of bounds: " + std::to_string(index) 
                         + ", size: " + std::to_string(l->size()));
-            return &(*l)[index];
+            return &(*l)[static_cast<std::size_t>(index)];
         } else if constexpr(std::is_same_v<L, map_ref>) {
             if constexpr(std::is_integral_v<R> || std::is_same_v<R, string_ref>) {
                 return &l->try_emplace(to_str(r), std::monostate()).first->second;

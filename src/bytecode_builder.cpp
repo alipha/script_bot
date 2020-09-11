@@ -302,7 +302,7 @@ std::string builder_impl::parse_str_literal(std::string_view str) {
 
 
 std::uint8_t builder_impl::add_capture(std::string_view name, std::uint8_t parent_index) {
-    std::uint8_t next_index = capture_indexes.size() + capture_index_start;
+    std::uint8_t next_index = static_cast<std::uint8_t>(capture_indexes.size() + capture_index_start);
     capture_indexes[name] = capture_mapping{parent_index, next_index};
     return next_index;
 }
@@ -334,7 +334,7 @@ std::uint8_t builder_impl::get_or_add_index(std::string_view name) {
     // if the variable doesn't exist, create it
     if(it == parents->end()) {
         std::size_t next_index = local_var_indexes.size() + 1;
-        return local_var_indexes[name] = next_index;
+        return local_var_indexes[name] = static_cast<std::uint8_t>(next_index);
     }
 
     if(debug && !index.has_value())

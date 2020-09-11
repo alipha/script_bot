@@ -12,6 +12,14 @@
 #include "object_fwd.hpp"
 
 
+template<typename T>
+T negate(const T &arg) { return -arg; }
+
+inline std::uint64_t negate(std::uint64_t arg) { 
+	return static_cast<std::uint64_t>(-static_cast<std::int64_t>(arg));
+}
+
+
 template<typename Int>
 std::int64_t to_int(const Int &arg) {
     using T = std::decay_t<decltype(arg)>;

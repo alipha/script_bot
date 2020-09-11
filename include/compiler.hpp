@@ -8,7 +8,7 @@
 
 
 class memory;
-class symbol;
+struct symbol;
 class compiler_impl;
 
 

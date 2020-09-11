@@ -45,10 +45,10 @@ void collect();
 
 
 template<typename T>
-struct ptr;
+class ptr;
 
 template<typename T>
-struct anchor_ptr;
+class anchor_ptr;
 
 struct action;
 

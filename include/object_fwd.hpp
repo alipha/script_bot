@@ -12,7 +12,7 @@
 
 
 class object;
-class func_def;
+struct func_def;
 
 
 using gcstring = std::basic_string<char, std::char_traits<char>, gc::allocator<char>>;
