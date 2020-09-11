@@ -1,6 +1,7 @@
 #ifndef LIPH_WRITER_HPP
 #define LIPH_WRITER_HPP
 
+#include "endian.hpp"
 #include "object.hpp"
 #include "serializer.hpp"
 
@@ -38,7 +39,8 @@ public:
     template<typename T>
     void write(const T &value) {
         static_assert(std::is_arithmetic_v<T>);
-        if(!os.write(reinterpret_cast<const char*>(&value), sizeof value))
+        char bytes[sizeof value];
+        if(!os.write(to_little_endian(bytes, value), sizeof value))
             throw std::runtime_error("error writing to file");
     }
 

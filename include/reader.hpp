@@ -1,6 +1,7 @@
 #ifndef LIPH_READER_HPP
 #define LIPH_READER_HPP
 
+#include "endian.hpp"
 #include "object.hpp"
 #include "serializer.hpp"
 
@@ -34,13 +35,13 @@ public:
 
     template<typename T>
     std::optional<T> read() {
-        T value;
-        if(!is.read(reinterpret_cast<char*>(&value), sizeof value))
+        char bytes[sizeof(T)];
+        if(!is.read(bytes, sizeof bytes))
             return std::nullopt;
-        else if(is.gcount() != sizeof value)
+        else if(is.gcount() != sizeof bytes)
             throw std::runtime_error("error: only partially read value from file");
         else
-            return {value};
+            return {from_little_endian<T>(bytes)};
     }
 
     template<typename T>

@@ -63,7 +63,7 @@ bool unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std
         } else {
             switch(code) {
             case op_code::plus:      return static_cast<std::int64_t>(v);
-			case op_code::negate:    return -static_cast<std::int64_t>(v);
+			case op_code::negate:    return -v;
             case op_code::bit_not:   return ~to_int(v);
             case op_code::pre_inc:   return v + 1;
             case op_code::pre_dec:   return v - 1;
