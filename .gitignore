@@ -42,3 +42,5 @@
 *.out
 *.app
 script_bot
+
+*.dat

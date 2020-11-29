@@ -29,7 +29,7 @@ struct func_def {
 class object {
 public:
     using non_null_type = std::variant<std::int64_t, std::uint64_t, double, 
-          string_ref, array_ref, map_ref, func_ref/*, class_ref, object_ref*/>;
+          string_ref, array_ref, map_ref, func_ref, class_ref, object_ref>;
     using value_type = variant_push_t<std::monostate, non_null_type>;
     using type = variant_push_t<variant_push_t<value_type, var_ref>, lvalue_ref>;
     using int_type = std::variant<std::int64_t, std::uint64_t>; 
@@ -73,7 +73,7 @@ struct class_type {
 
     void transverse(gc::action &act) { 
         for(auto &[key, value] : attrs)
-            act(value);
+            act(value.get());
     }
 
     gcstring owner;
@@ -86,7 +86,7 @@ struct object_type {
     void transverse(gc::action &act) { 
         act(type); 
         for(auto &[key, value] : attrs)
-            act(value);
+            act(value.get());
     }
 
     gcstring owner;
