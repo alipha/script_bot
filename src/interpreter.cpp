@@ -6,6 +6,7 @@
 #include "memory.hpp"
 #include "memory_buffer.hpp"
 #include "object.hpp"
+#include "operand.hpp"
 #include "operation_type.hpp"
 #include "stack_util.hpp"
 #include "string_util.hpp"
@@ -36,7 +37,7 @@ private:
         std::size_t code_size;
         std::size_t loops;
     };
-    
+
 public:
     interpreter_impl(memory *m, std::size_t max_call_depth) 
         : mem(m), max_depth(max_call_depth), last_value(), operands(), parent_operand_count(0) {}
@@ -60,7 +61,7 @@ private:
     memory *mem;
     std::size_t max_depth;
     gc::anchor<object> last_value;
-    gc::anchor<std::vector<object>> operands;
+    gc::anchor<std::vector<operand>> operands;
     std::size_t parent_operand_count;
 };
 
@@ -97,7 +98,7 @@ void interpreter_impl::execute_short_circuit(memory_buffer<debug> &buffer, op_co
 
     std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
 
-    if(operands->back().to_bool() == jump_value)
+    if(operands->back().value.to_bool() == jump_value)
         buffer.seek_abs(jump_pos);
     else
         operands->pop_back();
@@ -112,7 +113,7 @@ void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, op_code co
 
     std::uint32_t jump_pos = *buffer.read<std::uint32_t>();
 
-    if(!std::holds_alternative<std::monostate>(operands->back().value()))
+    if(!std::holds_alternative<std::monostate>(operands->back().value.value()))
         buffer.seek_abs(jump_pos);
     else
         operands->pop_back();
@@ -122,12 +123,12 @@ void interpreter_impl::execute_coalesce(memory_buffer<debug> &buffer, op_code co
 std::string interpreter_impl::execute(std::shared_ptr<func_def> program) {
     std::size_t position = 0;
     func_ref func = gc::make_ptr<func_type>(std::move(program), gcvector<var_ref>());
-    last_value = object::type(std::monostate());
+    last_value = object();
    
     parent_operand_count = 0; 
     operands->clear();
     mem->clear_stack();
-    mem->push_frame(no_parent, 0, func, make_array());
+    mem->push_frame(no_parent, 0, func, object(), make_array());
 
     program_state state = {
         std::time(nullptr),
@@ -300,8 +301,8 @@ void interpreter_impl::array_add() {
     if(debug && operands->size() < parent_operand_count + 2)
         throw std::logic_error("execute array_add with " + std::to_string(operands->size() - parent_operand_count) + " operands");
 
-    object &array = *(operands->end() - 2);
-    std::get<array_ref>(array.value())->push_back(operands->back());
+    object &array = (operands->end() - 2)->value;
+    std::get<array_ref>(array.value())->push_back(operands->back().value);
     operands->pop_back();
 }
 
@@ -310,8 +311,8 @@ void interpreter_impl::param_add() {
     if(debug && operands->size() < parent_operand_count + 2)
         throw std::logic_error("execute param_add with " + std::to_string(operands->size() - parent_operand_count) + " operands");
 
-    object &array = *(operands->end() - 2);
-    object::type param = to_variant<object::type>(operands->back().value());
+    object &array = (operands->end() - 2)->value;
+    object::type param = to_variant<object::type>(operands->back().value.value());
 
     gc::anchor_ptr<object> param_lvalue = make_lvalue(std::move(param));
     //gc::anchor_ptr<object> param_anchor = param_lvalue;
@@ -325,9 +326,9 @@ void interpreter_impl::map_add() {
     if(debug && operands->size() < parent_operand_count + 3)
         throw std::logic_error("execute map_add with " + std::to_string(operands->size() - parent_operand_count) + " operands");
 
-    object &value = operands->back();
-    object &key = *(operands->end() - 2);
-    object &map = *(operands->end() - 3);
+    object &value = operands->back().value;
+    object &key = (operands->end() - 2)->value;
+    object &map = (operands->end() - 3)->value;
     std::get<map_ref>(map.value())->try_emplace(key.to_string(), value);
     operands->pop_back();
     operands->pop_back();
@@ -341,13 +342,14 @@ void interpreter_impl::call_func(program_state &state) {
     if(mem->call_depth() > max_depth)
         throw std::runtime_error("stack overflow: max call depth of " + std::to_string(max_depth));
 
-    array_ref &params = std::get<array_ref>(operands->back().get());
-    object::value_type func_obj = (operands->end() - 2)->value();
+    array_ref &params = std::get<array_ref>(operands->back().value.get());
+    object &this_obj = (operands->end() - 2)->this_obj;
+    object::value_type func_obj = (operands->end() - 2)->value.value();
     func_ref *func = std::get_if<func_ref>(&func_obj);
     if(!func)
         throw std::runtime_error("left of () is not a function");
 
-    mem->push_frame(state.buffer->position(), operands->size() - 2, std::move(*func), std::move(params));
+    mem->push_frame(state.buffer->position(), operands->size() - 2, std::move(*func), std::move(this_obj), std::move(params));
     state.buffer = &mem->current_frame().func->definition->code;
     state.code_size = mem->current_frame().code_size;
     operands->pop_back();
@@ -365,7 +367,7 @@ void interpreter_impl::execute_binary_op(op_code code) {
     bool is_assign = is_binary_assignment(code);
     // TODO: only use anchors when the op is something that allocates memory?
     gc::anchor<object> right = pop(*operands);
-    gc::anchor<object> left = is_assign ? gc::anchor<object>(operands->back()) : pop(*operands);
+    gc::anchor<object> left = is_assign ? gc::anchor<object>(operands->back().value) : pop(*operands);
     object result;
 
     if(is_assign && code != op_code::assign) {

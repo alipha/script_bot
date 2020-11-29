@@ -22,6 +22,7 @@ struct frame {
     std::size_t local_var_count;
     std::size_t temps_start;
     func_ref func;
+    object this_obj;
     std::size_t code_size;
     array_ref params;
     std::size_t param_count;
@@ -35,7 +36,7 @@ struct frame {
 
 class memory {
 public:
-    void push_frame(std::size_t current_pos, std::size_t current_operand_count, func_ref func, array_ref params);
+    void push_frame(std::size_t current_pos, std::size_t current_operand_count, func_ref func, object this_obj, array_ref params);
     std::size_t pop_frame();
     void clear_stack();
    

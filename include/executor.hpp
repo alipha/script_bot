@@ -9,6 +9,7 @@
 
 
 class memory;
+struct operand;
 
 
 namespace executor {
@@ -19,7 +20,7 @@ object binary_arithmetic(op_code code, const object &left, const object &right);
 
 object index_op(memory *mem, const object &left, const object &right);
 
-bool unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std::size_t parent_operand_count, op_code code);
+bool unary_op(gc::anchor<object> &last_value, std::vector<operand> &operands, std::size_t parent_operand_count, op_code code);
 
 }
 

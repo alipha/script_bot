@@ -13,6 +13,8 @@
 
 class object;
 class func_def;
+class class_type;
+class object_type;
 
 
 using gcstring = std::basic_string<char, std::char_traits<char>, gc::allocator<char>>;
@@ -38,6 +40,10 @@ using array_ref = gc::ptr<gcvector<object>>;
 using map_ref = gc::ptr<gcmap>;
 using var_ref = gc::ptr<object>;    // a named variable (a global variable or capture, or currently, a local variable)
 using lvalue_ref = object*;    // a pointer to an assignable object (e.g., the result of x[i]). In the future, possibly local variables.
+
+using class_ref = gc::ptr<class_type>;
+using object_ref = gc::ptr<object_type>;
+
 
 
 struct func_type {

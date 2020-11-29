@@ -9,7 +9,7 @@
 #include <vector>
 
 
-void memory::push_frame(std::size_t current_pos, std::size_t current_operand_count, func_ref func, array_ref params) {
+void memory::push_frame(std::size_t current_pos, std::size_t current_operand_count, func_ref func, object this_obj, array_ref params) {
     gc::anchor_ptr<func_type> func_anchor = func;
     gc::anchor_ptr<gcvector<object>> params_anchor = params;
 
@@ -30,8 +30,8 @@ void memory::push_frame(std::size_t current_pos, std::size_t current_operand_cou
         local_var_stack->push_back(make_lvalue());
 
     frame f = {current_pos, current_operand_count, local_var_count, 
-        temps_stack->size(), std::move(func), code_size,
-        std::move(params), param_count};
+        temps_stack->size(), std::move(func), std::move(this_obj),
+        code_size, std::move(params), param_count};
     frame_stack->push_back(std::move(f));
 }
 

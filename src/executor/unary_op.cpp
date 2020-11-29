@@ -3,6 +3,7 @@
 #include "debug.hpp"
 #include "gc.hpp"
 #include "object.hpp"
+#include "operand.hpp"
 #include "operation_type.hpp"
 #include "stack_util.hpp"
 #include "string_util.hpp"
@@ -21,7 +22,7 @@ using namespace std::string_literals;
 namespace executor {
 
 
-bool unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std::size_t parent_operand_count, op_code code) {
+bool unary_op(gc::anchor<object> &last_value, std::vector<operand> &operands, std::size_t parent_operand_count, op_code code) {
     if(code == op_code::semicolon || code == op_code::ret) {
         //std::cout << "semicolon: " << operands.size() << ", " << parent_operand_count << std::endl;
         if(operands.size() > parent_operand_count)
@@ -37,10 +38,10 @@ bool unary_op(gc::anchor<object> &last_value, std::vector<object> &operands, std
 
     bool is_pre = (code == op_code::pre_inc || code == op_code::pre_dec);
     bool is_post = (code == op_code::post_inc || code == op_code::post_dec);
-    object operand = is_pre ? operands.back() : *pop(operands);
+    object operand = is_pre ? operands.back().value : *pop(operands);
     
     if(is_post)
-        operands.push_back(to_variant<object::type>(operand.value()));
+        operands.push_back(object(to_variant<object::type>(operand.value())));
 
     if(code == op_code::logic_not) {
         operands.push_back(object(static_cast<std::int64_t>(!operand.to_bool())));
